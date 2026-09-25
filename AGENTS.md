@@ -2,7 +2,7 @@
 
 ## Project Structure
 
-This repository contains a React, TypeScript, and Vite single-page app. UI components live in `src/components/`; the main editor is `src/App.tsx`; shared project validation and export logic is in `src/lib/`; the movement lexicon is `src/data/mouvements.json`; and visual styles are in `src/styles.css`. Keep movement records as `{ "nom": string, "description": string, "categorie": "main" | "pieds" }` entries. `dist/` is generated output and must not be committed.
+This repository contains a React, TypeScript, and Vite single-page app. UI components live in `src/components/`; the main editor is `src/App.tsx`; shared project validation and export logic is in `src/lib/`; the movement lexicon is `src/data/mouvements.json`; category icons are static SVG resources in `public/resources/icons/`; and visual styles are in `src/styles.css`. Keep movement records as `{ "nom": string, "description": string, "categorie": "main" | "pieds" }` entries. `dist/` is generated output and must not be committed.
 
 ## Development Commands
 

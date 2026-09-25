@@ -10,11 +10,13 @@ describe('App security and editor basics', () => {
     const payload = '<img src=x onerror=alert(1)>';
     fireEvent.change(screen.getByRole('textbox', { name: 'Nom du combattant 1' }), { target: { value: payload } });
     expect(screen.getByRole('textbox', { name: 'Nom du combattant 1' })).toHaveValue(payload);
-    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('img[src="x"]')).toBeNull();
   });
 
   it('shows movement descriptions on click and hides them when the pointer leaves', () => {
     const { container } = render(<App />);
+    expect(container.querySelector('img[src="/resources/icons/foot.svg"]')).toBeInTheDocument();
+    expect(container.querySelector('img[src="/resources/icons/hand.svg"]')).toBeInTheDocument();
     const movement = screen.getByRole('button', { name: /Marche/ });
     fireEvent.click(movement);
     expect(screen.getByRole('tooltip')).toHaveTextContent(/Avancer/);

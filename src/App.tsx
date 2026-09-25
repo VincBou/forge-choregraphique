@@ -178,9 +178,9 @@ export default function App() {
                     <button type="button" className={`movement-name category-${movement.categorie}`} aria-expanded={isOpen} onClick={() => setOpenDescription(isOpen ? null : movement.nom)} onKeyDown={(event) => { if (event.key === 'Escape') setOpenDescription(null); }}>
                       <span className="movement-category-icon" aria-hidden="true">
                         {movement.categorie === 'main' ? (
-                          <svg viewBox="0 0 24 24" focusable="false"><path d="M8 11V5.7a1.35 1.35 0 0 1 2.7 0V10 4.7a1.35 1.35 0 0 1 2.7 0V10 5.8a1.35 1.35 0 0 1 2.7 0V11 7.3a1.35 1.35 0 0 1 2.7 0v8.2c0 3.1-2.5 5.6-5.6 5.6h-2.4c-1.8 0-3.4-.8-4.5-2.2l-3.1-4a1.6 1.6 0 0 1 2.5-2l2.3 2.3V11Z" /></svg>
+                          <img src="/resources/icons/hand.svg" alt="" />
                         ) : (
-                          <svg viewBox="0 0 24 24" focusable="false"><path d="M8.7 2.8c1.4 0 2.3 1.1 2.3 2.7v5.1l1.1-1.2c.8-.8 2.1-.9 3-.1l4.2 3.8c1.1 1 1.3 2.6.6 3.9l-2.1 3.7c-.7 1.2-2 2-3.4 2H9.8c-1.8 0-3.4-1-4.2-2.6l-2.1-4.2c-.6-1.1-.1-2.4 1-2.9.9-.4 1.9 0 2.4.8l1.2 1.8V5.5c0-1.6.2-2.7.6-2.7Z" /></svg>
+                          <img src="/resources/icons/foot.svg" alt="" />
                         )}
                       </span>
                       <span className="sr-only">{movement.categorie === 'main' ? 'Mouvement de main : ' : 'Mouvement de pieds : '}</span>
