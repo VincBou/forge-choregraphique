@@ -9,13 +9,14 @@ import {
   migrateLegacyDraft,
   normalizeSearch,
   normalizeSingleLine,
+  PREVIOUS_STORAGE_KEY,
   STORAGE_KEY,
   type ChoreographyLine,
   type MovementCategory,
 } from './project';
 
 const line = (fields: Partial<ChoreographyLine> = {}): ChoreographyLine => ({
-  id: 'line-1', attacker: 'Combattant A', handMovement: 'Parade', footMovement: '', details: '', defender: '', ...fields,
+  id: 'line-1', attacker: 'Combattant A', handMovement: 'Parade', footMovement: '', details: '', defender: '', defenderMovement: '', defenderDetails: '', ...fields,
 });
 
 describe('project formatting and validation', () => {
@@ -30,8 +31,14 @@ describe('project formatting and validation', () => {
     expect(formatProject([
       line(),
       line({ id: 'empty', attacker: '', handMovement: '', footMovement: '', details: '', defender: '' }),
-      line({ id: 'two', attacker: 'B', handMovement: 'Riposte', footMovement: 'Marche', details: 'en avançant', defender: 'A' }),
-    ])).toBe('1. Combattant A Parade\n2. B Riposte Marche en avançant contre A');
+      line({ id: 'two', attacker: 'B', handMovement: 'Riposte', footMovement: 'Marche', details: 'en avançant', defender: 'A', defenderMovement: 'Esquive', defenderDetails: 'sur le côté' }),
+    ])).toBe('1. Combattant A Parade\n2. B Riposte Marche en avançant contre A qui Esquive sur le côté');
+  });
+
+  it('exports reaction movement or detail only when a defender is present', () => {
+    expect(formatProject([line({ defender: 'B', defenderDetails: 'se protège' })])).toBe('1. Combattant A Parade contre B qui se protège');
+    expect(formatProject([line({ defender: 'B', defenderMovement: 'Parade' })])).toBe('1. Combattant A Parade contre B qui Parade');
+    expect(formatProject([line({ defender: '', defenderMovement: 'Parade', defenderDetails: 'se protège' })])).toBe('1. Combattant A Parade');
   });
 
   it('requires an attacker and at least one movement on each started line', () => {
@@ -93,7 +100,7 @@ describe('project formatting and validation', () => {
     expect(migrated.lines[2]).toMatchObject({ handMovement: 'Mouvement libre', footMovement: '' });
   });
 
-  it('persists the migrated draft under v2 before removing the legacy key', () => {
+  it('persists the migrated draft under v3 before removing the v1 key', () => {
     const values = new Map([[LEGACY_STORAGE_KEY, JSON.stringify({
       fighters: ['A'],
       lines: [{ id: 'legacy', attacker: 'A', action: 'Marche', details: '', defender: '' }],
@@ -108,5 +115,21 @@ describe('project formatting and validation', () => {
     expect(loaded.draft.lines[0].footMovement).toBe('Marche');
     expect(values.has(STORAGE_KEY)).toBe(true);
     expect(values.has(LEGACY_STORAGE_KEY)).toBe(false);
+  });
+
+  it('migrates v2 drafts by adding empty defender reaction fields', () => {
+    const values = new Map([[PREVIOUS_STORAGE_KEY, JSON.stringify({
+      fighters: ['A', 'B'],
+      lines: [{ id: 'prior', attacker: 'A', handMovement: 'Parade', footMovement: '', details: '', defender: 'B' }],
+    })]]);
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value); },
+      removeItem: (key: string) => { values.delete(key); },
+    };
+    const loaded = loadDraft(storage);
+    expect(loaded.draft.lines[0]).toMatchObject({ defender: 'B', defenderMovement: '', defenderDetails: '' });
+    expect(values.has(STORAGE_KEY)).toBe(true);
+    expect(values.has(PREVIOUS_STORAGE_KEY)).toBe(false);
   });
 });

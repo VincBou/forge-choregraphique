@@ -99,7 +99,9 @@ h1 { margin-bottom: 0; font: 600 19px Arial, sans-serif; letter-spacing: -.03em;
 .defender-group { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .against-label { flex: 0 0 auto; color: #7e8798; font-size: 9px; }
 .defender-group .autocomplete { flex: 1; }
-.line-actions { display: flex; justify-content: flex-end; gap: 2px; }
+.defender-reaction { grid-column: 2 / 7; grid-row: 2; display: grid; grid-template-columns: auto minmax(110px, 1fr) minmax(140px, 1.15fr); align-items: center; gap: 8px; }
+.reaction-intro { color: #7e8798; font-size: 10px; }
+.line-actions { grid-column: 7; grid-row: 1; display: flex; justify-content: flex-end; gap: 2px; }
 .add-line { border-color: #e9ad5642; color: var(--accent); background: #e9ad560c; font-size: 17px; }
 .add-line:hover { border-color: #e9ad56; color: #1c1710; background: var(--accent); }
 .delete-line { color: #687386; font-size: 18px; }
@@ -143,13 +145,14 @@ kbd { padding: 2px 5px; margin-right: 5px; border: 1px solid #ffffff1a; border-r
   .autosave { padding: 6px 7px; font-size: 8px; }
   .notation-guide { display: none; }
   .choreo-line { grid-template-columns: 23px 1fr 1fr 57px; gap: 7px; padding: 10px 7px; }
-  .line-number { grid-column: 1; grid-row: 1 / 4; }
+  .line-number { grid-column: 1; grid-row: 1 / 5; }
   .choreo-line > .autocomplete:nth-of-type(1) { grid-column: 2; grid-row: 1; }
   .choreo-line > .autocomplete:nth-of-type(2) { grid-column: 3; grid-row: 1; }
   .choreo-line > .autocomplete:nth-of-type(3) { grid-column: 2; grid-row: 2; }
   .details-input { grid-column: 3; grid-row: 2; }
   .defender-group { grid-column: 2 / 4; grid-row: 3; }
-  .line-actions { grid-column: 4; grid-row: 1 / 4; flex-direction: column; }
+  .defender-reaction { grid-column: 2 / 4; grid-row: 4; grid-template-columns: auto 1fr 1fr; gap: 6px; }
+  .line-actions { grid-column: 4; grid-row: 1 / 5; flex-direction: column; }
   .autocomplete > input, .details-input { height: 37px; font-size: 10px; }
   .editor-footer { padding-left: 30px; }
   .page-footer { gap: 10px; font-size: 7px; }

@@ -8,6 +8,7 @@ import {
   getExportError,
   loadDraft,
   LEGACY_STORAGE_KEY,
+  PREVIOUS_STORAGE_KEY,
   MAX_DETAILS_LENGTH,
   MAX_FIGHTERS,
   MAX_LINES,
@@ -42,6 +43,7 @@ export default function App() {
   const [openDescription, setOpenDescription] = useState<string | null>(null);
   const hasEdited = useRef(false);
   const fighterSuggestions = useMemo(() => draft.fighters.filter(Boolean), [draft.fighters]);
+  const movementSuggestions = useMemo(() => movementList.map((movement) => movement.nom), []);
   const handSuggestions = useMemo(() => movementList.filter((movement) => movement.categorie === 'main').map((movement) => movement.nom), []);
   const footSuggestions = useMemo(() => movementList.filter((movement) => movement.categorie === 'pieds').map((movement) => movement.nom), []);
 
@@ -84,13 +86,26 @@ export default function App() {
     if (draft.lines.length >= MAX_LINES) return;
     const index = draft.lines.findIndex((line) => line.id === afterId);
     const lines = [...draft.lines];
-    lines.splice(index + 1, 0, { id: createLineId(), attacker: '', handMovement: '', footMovement: '', details: '', defender: '' });
+    lines.splice(index + 1, 0, { id: createLineId(), attacker: '', handMovement: '', footMovement: '', details: '', defender: '', defenderMovement: '', defenderDetails: '' });
     changeDraft({ ...draft, lines });
     setExportError(null);
   }
 
   function removeLine(id: string) {
     changeDraft({ ...draft, lines: draft.lines.filter((line) => line.id !== id) });
+    setExportError(null);
+  }
+
+  function handleDefenderBlur(id: string, defender: string) {
+    if (defender.trim()) return;
+    const line = draft.lines.find((candidate) => candidate.id === id);
+    if (!line || (!line.defenderMovement && !line.defenderDetails)) return;
+    changeDraft({
+      ...draft,
+      lines: draft.lines.map((candidate) => candidate.id === id
+        ? { ...candidate, defenderMovement: '', defenderDetails: '' }
+        : candidate),
+    });
     setExportError(null);
   }
 
@@ -112,6 +127,7 @@ export default function App() {
     let cleared = false;
     try {
       window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(PREVIOUS_STORAGE_KEY);
       window.localStorage.removeItem(LEGACY_STORAGE_KEY);
       cleared = true;
     } catch { /* State reset below still works for this session. */ }
@@ -218,15 +234,22 @@ export default function App() {
                 <input className="details-input" aria-label={`Détail libre, ligne ${index + 1}`} value={line.details} maxLength={MAX_DETAILS_LENGTH} autoComplete="off" placeholder="Ajouter un détail…" onChange={(event) => updateLine(line.id, 'details', event.target.value)} />
                 <div className="defender-group">
                   {line.defender.trim() && <span className="against-label">contre</span>}
-                  <AutocompleteInput id={`defender-${line.id}`} label={`Défenseur facultatif, ligne ${index + 1}`} value={line.defender} suggestions={fighterSuggestions} placeholder="Défenseur" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'defender', value)} />
+                  <AutocompleteInput id={`defender-${line.id}`} label={`Défenseur facultatif, ligne ${index + 1}`} value={line.defender} suggestions={fighterSuggestions} placeholder="Défenseur" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'defender', value)} onBlur={(value) => handleDefenderBlur(line.id, value)} />
                 </div>
+                {line.defender.trim() && (
+                  <div className="defender-reaction">
+                    <span className="reaction-intro">qui</span>
+                    <AutocompleteInput id={`defender-movement-${line.id}`} label={`Mouvement de réaction du défenseur, ligne ${index + 1}`} value={line.defenderMovement} suggestions={movementSuggestions} placeholder="Mouvement de réaction" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'defenderMovement', value)} />
+                    <input className="details-input" aria-label={`Détail de réaction du défenseur, ligne ${index + 1}`} value={line.defenderDetails} maxLength={MAX_DETAILS_LENGTH} autoComplete="off" placeholder="Détail / intention" onChange={(event) => updateLine(line.id, 'defenderDetails', event.target.value)} />
+                  </div>
+                )}
                 <div className="line-actions">
                   <button className="icon-button add-line" type="button" aria-label={`Ajouter une ligne après la ligne ${index + 1}`} disabled={draft.lines.length >= MAX_LINES} onClick={() => addLine(line.id)}>＋</button>
                   <button className="icon-button delete-line" type="button" aria-label={`Supprimer la ligne ${index + 1}`} onClick={() => removeLine(line.id)}>×</button>
                 </div>
               </div>
             ))}
-            {draft.lines.length === 0 && <div className="empty-state"><span className="empty-icon" aria-hidden="true">✦</span><p>La scène est à vous.</p><button className="button button-muted" type="button" onClick={() => changeDraft({ ...draft, lines: [{ id: createLineId(), attacker: '', handMovement: '', footMovement: '', details: '', defender: '' }] })}>Ajouter la première ligne</button></div>}
+            {draft.lines.length === 0 && <div className="empty-state"><span className="empty-icon" aria-hidden="true">✦</span><p>La scène est à vous.</p><button className="button button-muted" type="button" onClick={() => changeDraft({ ...draft, lines: [{ id: createLineId(), attacker: '', handMovement: '', footMovement: '', details: '', defender: '', defenderMovement: '', defenderDetails: '' }] })}>Ajouter la première ligne</button></div>}
           </div>
           {exportError && <p className="validation-message" role="alert">{exportError}</p>}
           <div className="editor-footer">

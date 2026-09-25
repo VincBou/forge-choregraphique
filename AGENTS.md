@@ -14,7 +14,7 @@ This repository contains a React, TypeScript, and Vite single-page app. UI compo
 
 ## Code and Test Conventions
 
-Use TypeScript for application code, React function components, two-space indentation, and descriptive camelCase names. Keep UI copy in French. Use React text rendering for user-controlled content; do not render entered or stored strings as HTML. Enforce the field limits and one-line normalization in `src/lib/project.ts` when changing input behavior. Put tests beside the behavior they cover using `.test.ts` or `.test.tsx` filenames, and run `npm test` after changes.
+Use TypeScript for application code, React function components, two-space indentation, and descriptive camelCase names. Keep UI copy in French. Use React text rendering for user-controlled content; do not render entered or stored strings as HTML. Enforce the field limits and one-line normalization in `src/lib/project.ts` when changing input behavior. Current project drafts use the `forgechoree.project.v3` local storage key; preserve migration from earlier versions when changing the draft shape. Put tests beside the behavior they cover using `.test.ts` or `.test.tsx` filenames, and run `npm test` after changes.
 
 ## Commits and Pull Requests
 

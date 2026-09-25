@@ -10,6 +10,7 @@ type Props = {
   maxLength?: number;
   required?: boolean;
   onChange: (value: string) => void;
+  onBlur?: (value: string) => void;
 };
 
 export default function AutocompleteInput({
@@ -21,6 +22,7 @@ export default function AutocompleteInput({
   maxLength = 100,
   required = false,
   onChange,
+  onBlur,
 }: Props) {
   const listId = useId();
   const [open, setOpen] = useState(false);
@@ -48,7 +50,10 @@ export default function AutocompleteInput({
         value={value}
         placeholder={placeholder}
         onFocus={() => { setOpen(true); setActiveIndex(-1); }}
-        onBlur={() => window.setTimeout(() => setOpen(false), 100)}
+        onBlur={(event) => {
+          onBlur?.(event.currentTarget.value);
+          window.setTimeout(() => setOpen(false), 100);
+        }}
         onChange={(event) => { onChange(event.target.value); setOpen(true); setActiveIndex(-1); }}
         onKeyDown={(event) => {
           if (event.key === 'Escape') setOpen(false);

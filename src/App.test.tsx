@@ -48,6 +48,37 @@ describe('App security and editor basics', () => {
     expect(within(screen.getByRole('listbox', { name: /Mouvement de pieds/ })).queryByRole('option', { name: 'Parade' })).not.toBeInTheDocument();
   });
 
+  it('shows the defender reaction with movement suggestions from every category', () => {
+    render(<App />);
+    const defender = screen.getByRole('combobox', { name: 'Défenseur facultatif, ligne 1' });
+    expect(screen.queryByRole('combobox', { name: 'Mouvement de réaction du défenseur, ligne 1' })).not.toBeInTheDocument();
+    fireEvent.change(defender, { target: { value: 'Combattant B' } });
+
+    const reaction = screen.getByRole('combobox', { name: 'Mouvement de réaction du défenseur, ligne 1' });
+    fireEvent.focus(reaction);
+    const suggestions = screen.getByRole('listbox', { name: /Mouvement de réaction du défenseur/ });
+    expect(within(suggestions).getByRole('option', { name: 'Parade' })).toBeInTheDocument();
+    expect(within(suggestions).getByRole('option', { name: 'Marche' })).toBeInTheDocument();
+  });
+
+  it('keeps reaction while replacing a defender and clears it on blur when defender remains empty', () => {
+    render(<App />);
+    const defender = screen.getByRole('combobox', { name: 'Défenseur facultatif, ligne 1' });
+    fireEvent.change(defender, { target: { value: 'Combattant B' } });
+    const reaction = screen.getByRole('combobox', { name: 'Mouvement de réaction du défenseur, ligne 1' });
+    fireEvent.change(reaction, { target: { value: 'Esquive' } });
+
+    fireEvent.change(defender, { target: { value: '' } });
+    fireEvent.change(defender, { target: { value: 'Combattant A' } });
+    expect(screen.getByRole('combobox', { name: 'Mouvement de réaction du défenseur, ligne 1' })).toHaveValue('Esquive');
+
+    fireEvent.change(defender, { target: { value: '' } });
+    fireEvent.blur(defender);
+    expect(screen.queryByRole('combobox', { name: 'Mouvement de réaction du défenseur, ligne 1' })).not.toBeInTheDocument();
+    fireEvent.change(defender, { target: { value: 'Combattant B' } });
+    expect(screen.getByRole('combobox', { name: 'Mouvement de réaction du défenseur, ligne 1' })).toHaveValue('');
+  });
+
   it('removes the saved draft without immediately writing a default draft back', () => {
     window.localStorage.setItem('forgechoree.project.v1', JSON.stringify({ fighters: ['Perso'], lines: [] }));
     window.confirm = () => true;
@@ -55,6 +86,7 @@ describe('App security and editor basics', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Effacer le brouillon local' }));
     expect(window.localStorage.getItem('forgechoree.project.v1')).toBeNull();
     expect(window.localStorage.getItem('forgechoree.project.v2')).toBeNull();
+    expect(window.localStorage.getItem('forgechoree.project.v3')).toBeNull();
     expect(screen.getByRole('status')).toHaveTextContent(/effacé/i);
   });
 });

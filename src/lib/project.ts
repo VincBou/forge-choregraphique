@@ -1,4 +1,5 @@
-export const STORAGE_KEY = 'forgechoree.project.v2';
+export const STORAGE_KEY = 'forgechoree.project.v3';
+export const PREVIOUS_STORAGE_KEY = 'forgechoree.project.v2';
 export const LEGACY_STORAGE_KEY = 'forgechoree.project.v1';
 export const MAX_NAME_LENGTH = 100;
 export const MAX_DETAILS_LENGTH = 500;
@@ -14,6 +15,8 @@ export type ChoreographyLine = {
   footMovement: string;
   details: string;
   defender: string;
+  defenderMovement: string;
+  defenderDetails: string;
 };
 
 export type ProjectDraft = {
@@ -34,11 +37,14 @@ type LegacyProjectDraft = {
   lines: LegacyChoreographyLine[];
 };
 
+type PreviousChoreographyLine = Omit<ChoreographyLine, 'defenderMovement' | 'defenderDetails'>;
+type PreviousProjectDraft = { fighters: string[]; lines: PreviousChoreographyLine[] };
+
 type DraftStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 export const defaultDraft = (): ProjectDraft => ({
   fighters: ['Combattant A', 'Combattant B'],
-  lines: [{ id: createLineId(), attacker: '', handMovement: '', footMovement: '', details: '', defender: '' }],
+  lines: [{ id: createLineId(), attacker: '', handMovement: '', footMovement: '', details: '', defender: '', defenderMovement: '', defenderDetails: '' }],
 });
 
 export function createLineId(): string {
@@ -93,8 +99,32 @@ export function isProjectDraft(value: unknown): value is ProjectDraft {
       && isValidText(row.handMovement, MAX_NAME_LENGTH)
       && isValidText(row.footMovement, MAX_NAME_LENGTH)
       && isValidText(row.defender, MAX_NAME_LENGTH)
+      && isValidText(row.details, MAX_DETAILS_LENGTH)
+      && isValidText(row.defenderMovement, MAX_NAME_LENGTH)
+      && isValidText(row.defenderDetails, MAX_DETAILS_LENGTH);
+  });
+}
+
+function isPreviousProjectDraft(value: unknown): value is PreviousProjectDraft {
+  if (!isValidDraftBase(value)) return false;
+  const ids = new Set<string>();
+  return value.lines.every((line) => {
+    if (!line || typeof line !== 'object') return false;
+    const row = line as PreviousChoreographyLine;
+    return isValidLineId(row.id, ids)
+      && isValidText(row.attacker, MAX_NAME_LENGTH)
+      && isValidText(row.handMovement, MAX_NAME_LENGTH)
+      && isValidText(row.footMovement, MAX_NAME_LENGTH)
+      && isValidText(row.defender, MAX_NAME_LENGTH)
       && isValidText(row.details, MAX_DETAILS_LENGTH);
   });
+}
+
+function migratePreviousDraft(previous: PreviousProjectDraft): ProjectDraft {
+  return {
+    fighters: [...previous.fighters],
+    lines: previous.lines.map((line) => ({ ...line, defenderMovement: '', defenderDetails: '' })),
+  };
 }
 
 function isLegacyProjectDraft(value: unknown): value is LegacyProjectDraft {
@@ -123,6 +153,8 @@ export function migrateLegacyDraft(
         ...line,
         handMovement: category === 'main' ? action : '',
         footMovement: category === 'pieds' ? action : '',
+        defenderMovement: '',
+        defenderDetails: '',
       };
     }),
   };
@@ -150,6 +182,22 @@ export function loadDraft(
       }
     }
 
+    const previousRaw = target.getItem(PREVIOUS_STORAGE_KEY);
+    if (previousRaw !== null) {
+      let previous: unknown = null;
+      try { previous = JSON.parse(previousRaw); } catch { /* Try the older draft format below. */ }
+      if (isPreviousProjectDraft(previous)) {
+        const draft = migratePreviousDraft(previous);
+        try {
+          target.setItem(STORAGE_KEY, JSON.stringify(draft));
+          target.removeItem(PREVIOUS_STORAGE_KEY);
+        } catch {
+          return { draft, warning: 'Le brouillon a Ã©tÃ© converti, mais nâ€™a pas pu Ãªtre enregistrÃ© dans le stockage local.', migrated: true };
+        }
+        return { draft, warning: null, migrated: true };
+      }
+    }
+
     const legacyRaw = target.getItem(LEGACY_STORAGE_KEY);
     if (legacyRaw !== null) {
       const legacy: unknown = JSON.parse(legacyRaw);
@@ -166,7 +214,7 @@ export function loadDraft(
       return { draft, warning: null, migrated: true };
     }
 
-    if (currentInvalid) {
+    if (currentInvalid || previousRaw !== null) {
       return { draft: defaultDraft(), warning: 'Le brouillon enregistré est invalide. Un nouveau projet a été ouvert.', migrated: false };
     }
     return { draft: defaultDraft(), warning: null, migrated: false };
@@ -176,7 +224,7 @@ export function loadDraft(
 }
 
 function isLineStarted(line: ChoreographyLine): boolean {
-  return [line.attacker, line.handMovement, line.footMovement, line.details, line.defender].some((part) => part.trim());
+  return [line.attacker, line.handMovement, line.footMovement, line.details, line.defender, line.defenderMovement, line.defenderDetails].some((part) => part.trim());
 }
 
 export function getExportError(lines: ChoreographyLine[]): string | null {
@@ -198,6 +246,9 @@ export function formatProject(lines: ChoreographyLine[]): string {
     const details = line.details.trim();
     const defender = line.defender.trim();
     const movements = [line.handMovement.trim(), line.footMovement.trim()].filter(Boolean).join(' ');
-    return `${index + 1}. ${line.attacker.trim()} ${movements}${details ? ` ${details}` : ''}${defender ? ` contre ${defender}` : ''}`;
+    const reaction = defender
+      ? [line.defenderMovement.trim(), line.defenderDetails.trim()].filter(Boolean).join(' ')
+      : '';
+    return `${index + 1}. ${line.attacker.trim()} ${movements}${details ? ` ${details}` : ''}${defender ? ` contre ${defender}${reaction ? ` qui ${reaction}` : ''}` : ''}`;
   }).join('\n');
 }
