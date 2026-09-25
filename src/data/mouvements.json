@@ -1,0 +1,42 @@
+[
+  {
+    "nom": "Marche",
+    "description": "Avancer en posant alternativement les pieds, sans les croiser, puis retrouver sa posture de départ.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Retraite",
+    "description": "Reculer en posant alternativement les pieds, sans les croiser, puis retrouver sa posture de départ.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Fente avant",
+    "description": "Projeter la jambe avant tout en détendant la jambe arrière pour amorcer une action offensive.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Parade",
+    "description": "Action défensive de la lame visant à bloquer la lame adverse. Elle peut être latérale, circulaire, semi-circulaire ou diagonale.",
+    "categorie": "main"
+  },
+  {
+    "nom": "Esquive",
+    "description": "Action défensive qui évite une touche par un déplacement du corps, partiel ou total.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Riposte",
+    "description": "Action offensive portée immédiatement après une protection.",
+    "categorie": "main"
+  },
+  {
+    "nom": "Battement",
+    "description": "Action de lame qui chasse la lame adverse par un contact bref et marqué.",
+    "categorie": "main"
+  },
+  {
+    "nom": "Feinte",
+    "description": "Simulacre d'action offensive ou défensive destiné à provoquer une réaction.",
+    "categorie": "main"
+  }
+]
