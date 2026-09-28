@@ -2,7 +2,7 @@
 
 ## Project Structure & Sources
 
-This React, TypeScript, and Vite app keeps its editor in `src/App.tsx`, autocomplete in `src/components/`, project validation and text export in `src/lib/`, and styles in `src/styles.css`. The movement lexicon is `src/data/mouvements.json`; category icons are SVG files in `public/resources/icons/`. The FFE source used for guard positions, footwork, and combined techniques is the *Sabre Laser — Livret 1, Cahier technique* PDF (v02.7.2), located beside this repository in the current workspace. Keep the lexicon selective and descriptions faithful to its corresponding chapters. Do not commit generated `dist/` files.
+This React, TypeScript, and Vite app keeps its editor in `src/App.tsx`, autocomplete in `src/components/`, project validation and text export in `src/lib/`, and styles in `src/styles.css`. The movement lexicon is `src/data/mouvements.json`; category icons are SVG files in `public/resources/icons/`. `Dockerfile` builds the static site, `compose.yaml` runs it, and `nginx/default.conf` configures the static server and response headers. The FFE source used for guard positions, footwork, and combined techniques is the *Sabre Laser — Livret 1, Cahier technique* PDF (v02.7.2), located beside this repository in the current workspace. Keep the lexicon selective and descriptions faithful to its corresponding chapters. Do not commit generated `dist/` files.
 
 ## Build, Test & Development Commands
 
@@ -11,6 +11,7 @@ This React, TypeScript, and Vite app keeps its editor in `src/App.tsx`, autocomp
 - `npm test` runs Vitest and React Testing Library tests.
 - `npm run build` type-checks and produces `dist/`.
 - `npm run security:audit` checks for high-severity dependency advisories.
+- `docker compose up --build` builds and starts the production container on port 8080.
 
 ## Coding & Data Conventions
 

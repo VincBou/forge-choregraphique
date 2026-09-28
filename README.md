@@ -26,4 +26,14 @@ npm run dev
 
 `npm test` lance Vitest ; `npm run build` vérifie TypeScript et crée `dist/` ; `npm run security:audit` contrôle les dépendances.
 
+## Avec Docker
+
+Avec Docker et le plugin Compose installés, lancez l’application compilée sur [http://localhost:8080](http://localhost:8080) :
+
+```sh
+docker compose up --build
+```
+
+Arrêtez le conteneur avec `Ctrl+C`, puis `docker compose down` si nécessaire.
+
 Le brouillon est enregistré dans le stockage local du navigateur. **Effacer le brouillon local** le supprime de cet appareil. Ce stockage n’est pas chiffré : ne saisissez pas de secrets. Avant une mise en ligne, appliquez les en-têtes décrits dans [SECURITY.md](./SECURITY.md).
