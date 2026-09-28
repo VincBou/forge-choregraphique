@@ -6,7 +6,7 @@ export const MAX_DETAILS_LENGTH = 500;
 export const MAX_FIGHTERS = 50;
 export const MAX_LINES = 500;
 
-export type MovementCategory = 'main' | 'pieds';
+export type MovementCategory = 'main' | 'pieds' | 'combine';
 
 export type ChoreographyLine = {
   id: string;
@@ -151,7 +151,7 @@ export function migrateLegacyDraft(
       const category = movementCategories.get(normalizeSearch(action.trim())) ?? 'main';
       return {
         ...line,
-        handMovement: category === 'main' ? action : '',
+        handMovement: category === 'pieds' ? '' : action,
         footMovement: category === 'pieds' ? action : '',
         defenderMovement: '',
         defenderDetails: '',

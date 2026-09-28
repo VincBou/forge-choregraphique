@@ -85,19 +85,22 @@ describe('project formatting and validation', () => {
     const categories = new Map<string, MovementCategory>([
       ['marche', 'pieds'],
       ['parade', 'main'],
+      ['supernova', 'combine'],
     ]);
     const legacy = {
       fighters: ['A', 'B'],
       lines: [
         { id: 'known-foot', attacker: 'A', action: 'Marche', details: '', defender: 'B' },
         { id: 'known-hand', attacker: 'B', action: 'Parade', details: '', defender: 'A' },
+        { id: 'known-combine', attacker: 'A', action: 'Supernova', details: '', defender: 'B' },
         { id: 'free', attacker: 'A', action: 'Mouvement libre', details: '', defender: '' },
       ],
     };
     const migrated = migrateLegacyDraft(legacy, categories);
     expect(migrated.lines[0]).toMatchObject({ handMovement: '', footMovement: 'Marche' });
     expect(migrated.lines[1]).toMatchObject({ handMovement: 'Parade', footMovement: '' });
-    expect(migrated.lines[2]).toMatchObject({ handMovement: 'Mouvement libre', footMovement: '' });
+    expect(migrated.lines[2]).toMatchObject({ handMovement: 'Supernova', footMovement: '' });
+    expect(migrated.lines[3]).toMatchObject({ handMovement: 'Mouvement libre', footMovement: '' });
   });
 
   it('persists the migrated draft under v3 before removing the v1 key', () => {

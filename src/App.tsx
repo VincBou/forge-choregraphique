@@ -29,10 +29,12 @@ function isMovementList(value: unknown): value is Movement[] {
     && (item as Movement).nom.length <= 100
     && typeof (item as Movement).description === 'string'
     && (item as Movement).description.length <= 1000
-    && ((item as Movement).categorie === 'main' || (item as Movement).categorie === 'pieds'));
+    && ['main', 'pieds', 'combine'].includes((item as Movement).categorie));
 }
 
 const movementList = isMovementList(movementData) ? movementData : [];
+const combinedMovementNames = new Set(movementList.filter((movement) => movement.categorie === 'combine').map((movement) => normalizeSearch(movement.nom)));
+const isCombinedMovement = (value: string) => combinedMovementNames.has(normalizeSearch(value.trim()));
 const movementCategories = new Map(movementList.map((movement) => [normalizeSearch(movement.nom), movement.categorie]));
 const initialState = loadDraft(undefined, movementCategories);
 
@@ -44,7 +46,7 @@ export default function App() {
   const hasEdited = useRef(false);
   const fighterSuggestions = useMemo(() => draft.fighters.filter(Boolean), [draft.fighters]);
   const movementSuggestions = useMemo(() => movementList.map((movement) => movement.nom), []);
-  const handSuggestions = useMemo(() => movementList.filter((movement) => movement.categorie === 'main').map((movement) => movement.nom), []);
+  const handSuggestions = useMemo(() => movementList.filter((movement) => movement.categorie === 'main' || movement.categorie === 'combine').map((movement) => movement.nom), []);
   const footSuggestions = useMemo(() => movementList.filter((movement) => movement.categorie === 'pieds').map((movement) => movement.nom), []);
 
   useEffect(() => {
@@ -78,7 +80,10 @@ export default function App() {
 
   function updateLine(id: string, field: keyof Omit<ChoreographyLine, 'id'>, value: string) {
     const limit = field === 'details' ? MAX_DETAILS_LENGTH : MAX_NAME_LENGTH;
-    changeDraft({ ...draft, lines: draft.lines.map((line) => line.id === id ? { ...line, [field]: normalizeSingleLine(value, limit) } : line) });
+    const normalized = normalizeSingleLine(value, limit);
+    changeDraft({ ...draft, lines: draft.lines.map((line) => line.id === id
+      ? { ...line, [field]: normalized, ...(field === 'handMovement' && isCombinedMovement(normalized) ? { footMovement: '' } : {}) }
+      : line) });
     setExportError(null);
   }
 
@@ -195,11 +200,13 @@ export default function App() {
                       <span className="movement-category-icon" aria-hidden="true">
                         {movement.categorie === 'main' ? (
                           <img src="/resources/icons/hand.svg" alt="" />
-                        ) : (
+                        ) : movement.categorie === 'pieds' ? (
                           <img src="/resources/icons/foot.svg" alt="" />
+                        ) : (
+                          <><img src="/resources/icons/hand.svg" alt="" /><img src="/resources/icons/foot.svg" alt="" /></>
                         )}
                       </span>
-                      <span className="sr-only">{movement.categorie === 'main' ? 'Mouvement de main : ' : 'Mouvement de pieds : '}</span>
+                      <span className="sr-only">{movement.categorie === 'main' ? 'Mouvement de main : ' : movement.categorie === 'pieds' ? 'Mouvement de pieds : ' : 'Mouvement combiné : '}</span>
                       {movement.nom}<span className="movement-chevron" aria-hidden="true">{isOpen ? '−' : '+'}</span>
                     </button>
                     {isOpen && <div className="movement-description" role="tooltip">{movement.description}</div>}
@@ -230,7 +237,7 @@ export default function App() {
                 <span className="line-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
                 <AutocompleteInput id={`attacker-${line.id}`} label={`Attaquant, ligne ${index + 1}`} value={line.attacker} suggestions={fighterSuggestions} placeholder="Choisir ou saisir" required maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'attacker', value)} />
                 <AutocompleteInput id={`hand-movement-${line.id}`} label={`Mouvement de main, ligne ${index + 1}`} value={line.handMovement} suggestions={handSuggestions} placeholder="Mouvement de main" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'handMovement', value)} />
-                <AutocompleteInput id={`foot-movement-${line.id}`} label={`Mouvement de pieds, ligne ${index + 1}`} value={line.footMovement} suggestions={footSuggestions} placeholder="Mouvement de pieds" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'footMovement', value)} />
+                {!(isCombinedMovement(line.handMovement) && !line.footMovement.trim()) && <AutocompleteInput id={`foot-movement-${line.id}`} label={`Mouvement de pieds, ligne ${index + 1}`} value={line.footMovement} suggestions={footSuggestions} placeholder="Mouvement de pieds" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'footMovement', value)} />}
                 <input className="details-input" aria-label={`Détail libre, ligne ${index + 1}`} value={line.details} maxLength={MAX_DETAILS_LENGTH} autoComplete="off" placeholder="Ajouter un détail…" onChange={(event) => updateLine(line.id, 'details', event.target.value)} />
                 <div className="defender-group">
                   {line.defender.trim() && <span className="against-label">contre</span>}

@@ -15,14 +15,179 @@
     "categorie": "pieds"
   },
   {
-    "nom": "Parade",
-    "description": "Action défensive de la lame visant à bloquer la lame adverse. Elle peut être latérale, circulaire, semi-circulaire ou diagonale.",
-    "categorie": "main"
+    "nom": "Pas latéral",
+    "description": "Se déplacer de côté en avançant d'abord le pied proche de la direction choisie, puis l'autre pied sans croiser les jambes.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Fente arrière",
+    "description": "Projeter le corps vers l'arrière par détente de la jambe avant et réception sur la jambe arrière.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Fente latérale",
+    "description": "Effectuer une fente en projetant le corps vers la droite ou la gauche.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Fente diagonale",
+    "description": "Associer une fente avant ou arrière à une projection latérale, vers la droite ou la gauche.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Fente inversée avant",
+    "description": "Détendre la jambe avant et projeter la jambe arrière devant le combattant.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Fente inversée arrière",
+    "description": "Détendre la jambe arrière et projeter la jambe avant derrière le combattant.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Redoublement",
+    "description": "Enchaîner une fente et une fente inversée sans reprise de garde entre les deux.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Changement de garde avant",
+    "description": "Avancer rapidement d'un pas complet en changeant de garde.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Changement de garde arrière",
+    "description": "Reculer rapidement d'un pas complet en changeant de garde.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Retour en garde",
+    "description": "Ramener la jambe avant vers l'arrière pour retrouver la garde de départ en cédant de la distance.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Reprise de garde",
+    "description": "Avancer la jambe arrière pour retrouver une garde similaire à celle de départ en gagnant de la distance.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Marche en trois temps",
+    "description": "Enchaîner deux changements de garde sans marquer le premier appui, avec une progression en diagonale.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Passe avant",
+    "description": "Passer le pied arrière devant le pied avant, puis retrouver la position de garde.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Passe arrière",
+    "description": "Passer le pied avant derrière le pied arrière, puis retrouver la position de garde.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Passe latérale",
+    "description": "Se déplacer de côté en passant d'abord la jambe opposée à la direction choisie, de façon à croiser les jambes.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Marche inversée",
+    "description": "Rapprocher le pied arrière du pied avant, puis avancer le pied avant pour retrouver une posture équilibrée.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Retraite inversée",
+    "description": "Rapprocher le pied avant du pied arrière, puis reculer le pied arrière pour retrouver une posture équilibrée.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Bond avant",
+    "description": "Sauter vers l'avant en poussant puis en reposant les deux pieds simultanément.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Bond arrière",
+    "description": "Sauter vers l'arrière en poussant puis en reposant les deux pieds simultanément.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Volte",
+    "description": "Effectuer une demi-volte puis un changement de garde vers l'avant pour retrouver la garde initiale.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Contre-volte",
+    "description": "Changer de garde vers l'avant puis effectuer une demi-volte pour retrouver la garde initiale.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Demi-volte",
+    "description": "Pivoter vers l'intérieur sur le pied avant pendant que le pied arrière décrit un demi-cercle, afin d'inverser la garde.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Volte sautée",
+    "description": "Réaliser une volte avec un saut vers l'avant ou l'arrière.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Glissade",
+    "description": "Glisser au sol sur les deux tibias.",
+    "categorie": "pieds"
+  },
+  {
+    "nom": "Roulade",
+    "description": "Rouler au sol vers l'avant ou l'arrière en se projetant bras tendus.",
+    "categorie": "pieds"
   },
   {
     "nom": "Esquive",
     "description": "Action défensive qui évite une touche par un déplacement du corps, partiel ou total.",
     "categorie": "pieds"
+  },
+  {
+    "nom": "Prime",
+    "description": "Garde protégeant le côté non armé, lame vers l'avant avec la pointe basse et la main directrice en pronation.",
+    "categorie": "main"
+  },
+  {
+    "nom": "Seconde",
+    "description": "Garde protégeant le côté armé, lame vers l'avant avec la pointe basse et la main directrice en pronation.",
+    "categorie": "main"
+  },
+  {
+    "nom": "Tierce",
+    "description": "Garde protégeant le côté armé, lame orientée vers l'avant avec la pointe haute et la main directrice en pronation.",
+    "categorie": "main"
+  },
+  {
+    "nom": "Quarte",
+    "description": "Garde protégeant le côté non armé, lame orientée vers l'avant avec la pointe haute et la main directrice en pronation.",
+    "categorie": "main"
+  },
+  {
+    "nom": "Quinte",
+    "description": "Garde contre une attaque verticale descendante à la tête, lame en travers avec la pointe basse et main directrice en pronation devant l'épaule armée.",
+    "categorie": "main"
+  },
+  {
+    "nom": "Quinte inverse",
+    "description": "Variante de la quinte contre une attaque verticale à la tête, pointe basse et main directrice en pronation devant l'épaule non armée.",
+    "categorie": "main"
+  },
+  {
+    "nom": "Sixte",
+    "description": "Garde protégeant le côté armé, lame vers l'avant avec la pointe haute et la main directrice en supination.",
+    "categorie": "main"
+  },
+  {
+    "nom": "Septime",
+    "description": "Garde protégeant le côté non armé, lame vers l'avant avec la pointe basse et la main directrice en supination.",
+    "categorie": "main"
+  },
+  {
+    "nom": "Octave",
+    "description": "Garde protégeant le côté armé, lame vers l'avant avec la pointe basse et la main directrice en supination.",
+    "categorie": "main"
   },
   {
     "nom": "Riposte",
@@ -35,8 +200,43 @@
     "categorie": "main"
   },
   {
-    "nom": "Feinte",
-    "description": "Simulacre d'action offensive ou défensive destiné à provoquer une réaction.",
-    "categorie": "main"
+    "nom": "Prise des guerriers",
+    "description": "Maintenir les deux lames en pression au contact et avancer jusqu'à la courte distance pour empêcher la riposte.",
+    "categorie": "combine"
+  },
+  {
+    "nom": "Écharpe d'honneur",
+    "description": "Avancer avec un halo extérieur, frapper en oblique vers la clavicule et terminer en fente avant.",
+    "categorie": "combine"
+  },
+  {
+    "nom": "Supernova",
+    "description": "Glisser vers l'avant, bondir et finir en fente par une estoc en zone 4. Deux temps sans armé, interdite en combat sportif.",
+    "categorie": "combine"
+  },
+  {
+    "nom": "Étendue de la cité des nuages",
+    "description": "Bondir vers l'avant, réceptionner sur la jambe armée avec l'autre cheville derrière son genou, et porter une estoc en zone 5 ou 4. Interdite en combat sportif.",
+    "categorie": "combine"
+  },
+  {
+    "nom": "Lever de rideau",
+    "description": "Associer une esquive de jambe à une coupe oblique remontante, puis lever le sabre au-dessus de la tête pour menacer l'adversaire.",
+    "categorie": "combine"
+  },
+  {
+    "nom": "Nuée de lames",
+    "description": "Esquiver par un léger retrait du buste sans déplacer les jambes, tout en déviant la lame adverse par une parade en couronné.",
+    "categorie": "combine"
+  },
+  {
+    "nom": "Corne du Dragon",
+    "description": "S'abaisser pour éviter une attaque, puis riposter en oblique remontante pendant une fente latérale, sabre levé au-dessus de la tête.",
+    "categorie": "combine"
+  },
+  {
+    "nom": "Éruption Solaire",
+    "description": "Esquiver en demi-volte, buste abaissé, puis finir dos à l'adversaire en fente avec une riposte remontante.",
+    "categorie": "combine"
   }
 ]

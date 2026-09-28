@@ -17,7 +17,7 @@ describe('App security and editor basics', () => {
     const { container } = render(<App />);
     expect(container.querySelector('img[src="/resources/icons/foot.svg"]')).toBeInTheDocument();
     expect(container.querySelector('img[src="/resources/icons/hand.svg"]')).toBeInTheDocument();
-    const movement = screen.getByRole('button', { name: /Marche/ });
+    const movement = screen.getByRole('button', { name: /Mouvement de pieds :Marche$/ });
     fireEvent.click(movement);
     expect(screen.getByRole('tooltip')).toHaveTextContent(/Avancer/);
     const item = container.querySelector('.movement-item');
@@ -37,15 +37,31 @@ describe('App security and editor basics', () => {
   it('offers movements only from the matching category', () => {
     render(<App />);
     const hand = screen.getByRole('combobox', { name: 'Mouvement de main, ligne 1' });
-    fireEvent.change(hand, { target: { value: 'a' } });
-    expect(screen.getByRole('listbox', { name: /Mouvement de main/ })).toHaveTextContent(/Parade/);
+    fireEvent.change(hand, { target: { value: 'quarte' } });
+    expect(screen.getByRole('listbox', { name: /Mouvement de main/ })).toHaveTextContent(/Quarte/);
     expect(within(screen.getByRole('listbox', { name: /Mouvement de main/ })).queryByRole('option', { name: 'Marche' })).not.toBeInTheDocument();
     fireEvent.change(hand, { target: { value: '' } });
 
     const feet = screen.getByRole('combobox', { name: 'Mouvement de pieds, ligne 1' });
     fireEvent.change(feet, { target: { value: 'm' } });
     expect(screen.getByRole('listbox', { name: /Mouvement de pieds/ })).toHaveTextContent(/Marche/);
-    expect(within(screen.getByRole('listbox', { name: /Mouvement de pieds/ })).queryByRole('option', { name: 'Parade' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('listbox', { name: /Mouvement de pieds/ })).queryByRole('option', { name: 'Quarte' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('listbox', { name: /Mouvement de pieds/ })).queryByRole('option', { name: 'Supernova' })).not.toBeInTheDocument();
+  });
+
+  it('offers combined actions in the hand field and clears then hides the foot field', () => {
+    render(<App />);
+    const combinedMovement = screen.getByRole('button', { name: /Mouvement combiné :Supernova/ });
+    expect(combinedMovement.querySelectorAll('img')).toHaveLength(2);
+
+    const hand = screen.getByRole('combobox', { name: 'Mouvement de main, ligne 1' });
+    const feet = screen.getByRole('combobox', { name: 'Mouvement de pieds, ligne 1' });
+    fireEvent.change(feet, { target: { value: 'Marche' } });
+    fireEvent.change(hand, { target: { value: 'Supernova' } });
+    expect(screen.queryByRole('combobox', { name: 'Mouvement de pieds, ligne 1' })).not.toBeInTheDocument();
+
+    fireEvent.change(hand, { target: { value: 'Parade' } });
+    expect(screen.getByRole('combobox', { name: 'Mouvement de pieds, ligne 1' })).toHaveValue('');
   });
 
   it('shows the defender reaction with movement suggestions from every category', () => {
@@ -56,9 +72,10 @@ describe('App security and editor basics', () => {
 
     const reaction = screen.getByRole('combobox', { name: 'Mouvement de réaction du défenseur, ligne 1' });
     fireEvent.focus(reaction);
-    const suggestions = screen.getByRole('listbox', { name: /Mouvement de réaction du défenseur/ });
-    expect(within(suggestions).getByRole('option', { name: 'Parade' })).toBeInTheDocument();
-    expect(within(suggestions).getByRole('option', { name: 'Marche' })).toBeInTheDocument();
+    fireEvent.change(reaction, { target: { value: 'quarte' } });
+    expect(within(screen.getByRole('listbox', { name: /Mouvement de réaction du défenseur/ })).getByRole('option', { name: 'Quarte' })).toBeInTheDocument();
+    fireEvent.change(reaction, { target: { value: 'marche' } });
+    expect(within(screen.getByRole('listbox', { name: /Mouvement de réaction du défenseur/ })).getByRole('option', { name: 'Marche' })).toBeInTheDocument();
   });
 
   it('keeps reaction while replacing a defender and clears it on blur when defender remains empty', () => {

@@ -1,6 +1,6 @@
 # Forge Chorée
 
-Application web à page unique pour composer un projet de combat chorégraphié au sabre laser. Le lexique initial non exhaustif se trouve dans `src/data/mouvements.json`. Chaque mouvement possède un nom, une description et une catégorie (`main` ou `pieds`). Les champs de mouvement de l’attaquant sont séparés par catégorie ; la réaction du défenseur propose le lexique complet.
+Application web à page unique pour composer un projet de combat chorégraphié au sabre laser. Le lexique initial non exhaustif se trouve dans `src/data/mouvements.json`. Chaque mouvement possède un nom, une description et une catégorie (`main`, `pieds` ou `combine`). Les actions combinées se saisissent dans le champ main et remplacent le mouvement de pieds de la ligne.
 
 ## Démarrer
 
