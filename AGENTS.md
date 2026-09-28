@@ -1,25 +1,25 @@
 # Repository Guidelines
 
-## Project Structure
+## Project Structure & Sources
 
-This repository contains a React, TypeScript, and Vite single-page app. UI components live in `src/components/`; the main editor is `src/App.tsx`; shared project validation and export logic is in `src/lib/`; the movement lexicon is `src/data/mouvements.json`; category icons are static SVG resources in `public/resources/icons/`; and visual styles are in `src/styles.css`. Keep movement records as `{ "nom": string, "description": string, "categorie": "main" | "pieds" | "combine" }` entries. `dist/` is generated output and must not be committed.
+This React, TypeScript, and Vite app keeps its editor in `src/App.tsx`, autocomplete in `src/components/`, project validation and text export in `src/lib/`, and styles in `src/styles.css`. The movement lexicon is `src/data/mouvements.json`; category icons are SVG files in `public/resources/icons/`. The FFE source used for guard positions, footwork, and combined techniques is the *Sabre Laser — Livret 1, Cahier technique* PDF (v02.7.2), located beside this repository in the current workspace. Keep the lexicon selective and descriptions faithful to its corresponding chapters. Do not commit generated `dist/` files.
 
-## Development Commands
+## Build, Test & Development Commands
 
-- `npm ci` installs the exact dependency tree recorded in `package-lock.json`.
-- `npm run dev` starts the local Vite development server.
-- `npm test` runs the Vitest and React Testing Library suite.
-- `npm run build` type-checks the app and creates the production site in `dist/`.
-- `npm run security:audit` checks dependencies for known high-severity vulnerabilities.
+- `npm ci` installs the locked dependencies.
+- `npm run dev` starts the local Vite server.
+- `npm test` runs Vitest and React Testing Library tests.
+- `npm run build` type-checks and produces `dist/`.
+- `npm run security:audit` checks for high-severity dependency advisories.
 
-## Code and Test Conventions
+## Coding & Data Conventions
 
-Use TypeScript for application code, React function components, two-space indentation, and descriptive camelCase names. Keep UI copy in French. Use React text rendering for user-controlled content; do not render entered or stored strings as HTML. Enforce the field limits and one-line normalization in `src/lib/project.ts` when changing input behavior. Current project drafts use the `forgechoree.project.v3` local storage key; preserve migration from earlier versions when changing the draft shape. Put tests beside the behavior they cover using `.test.ts` or `.test.tsx` filenames, and run `npm test` after changes.
+Use two-space indentation, React function components, descriptive camelCase names, and French UI text. Movement records have `nom`, `description`, and `categorie` (`main`, `pieds`, or `combine`). A combined movement is selected in the hand field and clears the foot field. Autocomplete suggestions are optional; preserve free text. Fighter renames commit on Enter or blur and replace exact attacker and defender name matches across all lines. An existing fighter name left blank reverts. Keep field normalization and limits in `src/lib/project.ts`. Drafts use the `forgechoree.project.v3` local-storage key; preserve migration when changing their shape.
 
-## Commits and Pull Requests
+## Testing Guidelines
 
-No commit history establishes a convention yet. Use a short imperative subject, such as `Add movement descriptions`. Pull requests should describe user-visible changes, list build and test results, and include screenshots for visual changes. Explain any dependency updates and keep `package-lock.json` synchronized with `package.json`.
+Place focused `.test.ts` or `.test.tsx` files beside the code they cover. Exercise editor behavior, lexicon categories, defender reactions, exact fighter-name replacement, draft persistence, and text export where affected. Run `npm test` and `npm run build` for application changes.
 
-## Security and Configuration
+## Commits, Pull Requests & Security
 
-Read `SECURITY.md` before changing persistence, rendering, dependencies, or deployment headers. The local draft is not encrypted and must not hold secrets. Keep secrets and local environment files out of version control; `.env` files are ignored.
+Git history uses short English imperative subjects, such as `Add Defender reaction`; no formal prefix is established. PRs should describe user-visible behavior, report relevant checks, and include screenshots for visual changes. Keep `package-lock.json` synchronized with dependency changes. Read `SECURITY.md` before changing rendering, persistence, dependencies, or deployment headers. Render stored and entered values as text, never HTML; the local draft is unencrypted and must not contain secrets. Keep `.env` files out of version control.
