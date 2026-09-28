@@ -43,6 +43,7 @@ export default function App() {
   const [notice, setNotice] = useState(initialState.warning);
   const [exportError, setExportError] = useState<string | null>(null);
   const [openDescription, setOpenDescription] = useState<string | null>(null);
+  const [fighterEdits, setFighterEdits] = useState<Record<number, string>>({});
   const hasEdited = useRef(false);
   const fighterSuggestions = useMemo(() => draft.fighters.filter(Boolean), [draft.fighters]);
   const movementSuggestions = useMemo(() => movementList.map((movement) => movement.nom), []);
@@ -64,10 +65,28 @@ export default function App() {
     setNotice(null);
   }
 
-  function updateFighter(index: number, value: string) {
+  function updateFighterEdit(index: number, value: string) {
+    setFighterEdits((edits) => ({ ...edits, [index]: value }));
+  }
+
+  function commitFighterEdit(index: number) {
+    const editedName = fighterEdits[index];
+    if (editedName === undefined) return;
+
+    const newName = normalizeSingleLine(editedName, MAX_NAME_LENGTH);
+    const oldName = draft.fighters[index];
+    setFighterEdits(({ [index]: _discarded, ...edits }) => edits);
+
+    if (!newName.trim() || oldName === newName) return;
+
     const fighters = [...draft.fighters];
-    fighters[index] = normalizeSingleLine(value, MAX_NAME_LENGTH);
-    changeDraft({ ...draft, fighters });
+    fighters[index] = newName;
+    const lines = oldName ? draft.lines.map((line) => ({
+      ...line,
+      attacker: line.attacker === oldName ? newName : line.attacker,
+      defender: line.defender === oldName ? newName : line.defender,
+    })) : draft.lines;
+    changeDraft({ ...draft, fighters, lines });
   }
 
   function addFighter() {
@@ -171,11 +190,19 @@ export default function App() {
                   <span className="fighter-dot" aria-hidden="true" />
                   <input
                     aria-label={`Nom du combattant ${index + 1}`}
-                    value={fighter}
+                    value={fighterEdits[index] ?? fighter}
                     maxLength={MAX_NAME_LENGTH}
                     autoComplete="off"
                     placeholder={`Combattant ${String.fromCharCode(65 + (index % 26))}`}
-                    onChange={(event) => updateFighter(index, event.target.value)}
+                    onFocus={() => updateFighterEdit(index, fighter)}
+                    onChange={(event) => updateFighterEdit(index, event.target.value)}
+                    onBlur={() => commitFighterEdit(index)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        commitFighterEdit(index);
+                      }
+                    }}
                   />
                   <button className="icon-button remove-fighter" type="button" aria-label={`Supprimer le combattant ${index + 1}`} onClick={() => removeFighter(index)}>×</button>
                 </div>

@@ -49,6 +49,49 @@ describe('App security and editor basics', () => {
     expect(within(screen.getByRole('listbox', { name: /Mouvement de pieds/ })).queryByRole('option', { name: 'Supernova' })).not.toBeInTheDocument();
   });
 
+  it('renames all exact attacker and defender references when a fighter name is committed', () => {
+    render(<App />);
+    const attacker1 = screen.getByRole('combobox', { name: 'Attaquant, ligne 1' });
+    const defender1 = screen.getByRole('combobox', { name: 'Défenseur facultatif, ligne 1' });
+    fireEvent.change(attacker1, { target: { value: 'Combattant A' } });
+    fireEvent.change(defender1, { target: { value: 'Combattant A' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter une ligne après la ligne 1' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Attaquant, ligne 2' }), { target: { value: 'Combattant A bis' } });
+
+    const fighter = screen.getByRole('textbox', { name: 'Nom du combattant 1' });
+    fireEvent.focus(fighter);
+    fireEvent.change(fighter, { target: { value: 'Alice' } });
+    expect(attacker1).toHaveValue('Combattant A');
+    fireEvent.keyDown(fighter, { key: 'Enter' });
+
+    expect(fighter).toHaveValue('Alice');
+    expect(attacker1).toHaveValue('Alice');
+    expect(defender1).toHaveValue('Alice');
+    expect(screen.getByRole('combobox', { name: 'Attaquant, ligne 2' })).toHaveValue('Combattant A bis');
+    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v3') ?? '{}');
+    expect(savedDraft.fighters[0]).toBe('Alice');
+    expect(savedDraft.lines[0].attacker).toBe('Alice');
+    expect(savedDraft.lines[0].defender).toBe('Alice');
+  });
+
+  it('restores an existing fighter name when cleared and leaves new empty fighters unlinked', () => {
+    render(<App />);
+    const attacker = screen.getByRole('combobox', { name: 'Attaquant, ligne 1' });
+    fireEvent.change(attacker, { target: { value: 'Combattant A' } });
+
+    const fighter = screen.getByRole('textbox', { name: 'Nom du combattant 1' });
+    fireEvent.change(fighter, { target: { value: '' } });
+    fireEvent.blur(fighter);
+    expect(fighter).toHaveValue('Combattant A');
+    expect(attacker).toHaveValue('Combattant A');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter un combattant' }));
+    const newFighter = screen.getByRole('textbox', { name: 'Nom du combattant 3' });
+    fireEvent.change(newFighter, { target: { value: 'Alice' } });
+    fireEvent.blur(newFighter);
+    expect(attacker).toHaveValue('Combattant A');
+  });
+
   it('offers combined actions in the hand field and clears then hides the foot field', () => {
     render(<App />);
     const combinedMovement = screen.getByRole('button', { name: /Mouvement combiné :Supernova/ });
