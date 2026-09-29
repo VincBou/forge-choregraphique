@@ -7,7 +7,9 @@ Application web à page unique pour écrire un projet chorégraphique de sabre l
 - L’équipe commence avec « Combattant A » et « Combattant B ». Après validation d’un nouveau nom par Entrée ou en quittant le champ, ses occurrences exactes dans les rôles Attaquant et Défenseur sont mises à jour. Un nom existant laissé vide est restauré.
 - Les mouvements `main` sont proposés dans le champ de main, les mouvements `pieds` dans celui de pieds. Les actions `combine` réunissent les deux et se choisissent dans le champ de main ; elles effacent le mouvement de pieds déjà saisi et masquent ce champ.
 - Le défenseur est facultatif. Lorsqu’il est renseigné, les champs de réaction (« qui », mouvement et détail libre) apparaissent. Le bouton `+` ajoute une ligne.
-- **Télécharger le projet** exporte un fichier `.txt`. Une ligne commencée doit avoir un attaquant et au moins un mouvement de main ou de pieds pour être exportée.
+- Les lignes sont regroupées dans des **Phrases d’armes** (au moins une). Le panneau de chaque phrase reste à gauche de ses lignes ; faites glisser leur numéro pour réordonner ou changer de phrase. Les boutons fléchés permettent aussi de déplacer les lignes au clavier.
+- Chaque phrase commence à la fin de la précédente (la première commence à `0.0`). Saisissez sa fin ; les fins suivantes avancent si nécessaire pour garder une chronologie valide. Une nouvelle phrase reprend la fin précédente. Les phrases vides restent dans l’éditeur, mais ne figurent pas dans l’export.
+- **Télécharger le projet** exporte un fichier `.txt` avec les marqueurs de début et de fin, puis les lignes numérotées par phrase (par exemple `1.2`). Une ligne commencée doit avoir un attaquant et au moins un mouvement de main ou de pieds pour être exportée.
 
 ## Lexique des mouvements et source FFE
 
@@ -36,4 +38,4 @@ docker compose up --build
 
 Arrêtez le conteneur avec `Ctrl+C`, puis `docker compose down` si nécessaire.
 
-Le brouillon est enregistré dans le stockage local du navigateur. **Effacer le brouillon local** le supprime de cet appareil. Ce stockage n’est pas chiffré : ne saisissez pas de secrets. Avant une mise en ligne, appliquez les en-têtes décrits dans [SECURITY.md](./SECURITY.md).
+Le brouillon, y compris les phrases et leurs lignes, est enregistré dans le stockage local du navigateur. Les anciens brouillons sont migrés automatiquement vers le format courant. **Effacer le brouillon local** le supprime de cet appareil. Ce stockage n’est pas chiffré : ne saisissez pas de secrets. Avant une mise en ligne, appliquez les en-têtes décrits dans [SECURITY.md](./SECURITY.md).

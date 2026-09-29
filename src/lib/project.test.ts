@@ -9,6 +9,7 @@ import {
   migrateLegacyDraft,
   normalizeSearch,
   normalizeSingleLine,
+  OLDER_STORAGE_KEY,
   PREVIOUS_STORAGE_KEY,
   STORAGE_KEY,
   type ChoreographyLine,
@@ -18,35 +19,45 @@ import {
 const line = (fields: Partial<ChoreographyLine> = {}): ChoreographyLine => ({
   id: 'line-1', attacker: 'Combattant A', handMovement: 'Parade', footMovement: '', details: '', defender: '', defenderMovement: '', defenderDetails: '', ...fields,
 });
+const draftWithLines = (lines: ChoreographyLine[]) => {
+  const draft = defaultDraft();
+  return { ...draft, phrases: [{ ...draft.phrases[0], lines }] };
+};
 
 describe('project formatting and validation', () => {
   it('starts with the two default fighters and one empty line', () => {
     const draft = defaultDraft();
     expect(draft.fighters).toEqual(['Combattant A', 'Combattant B']);
-    expect(draft.lines).toHaveLength(1);
-    expect(getExportError(draft.lines)).toMatch(/au moins une action/i);
+    expect(draft.phrases).toHaveLength(1);
+    expect(draft.phrases[0].lines).toHaveLength(1);
+    expect(getExportError(draft)).toMatch(/au moins une action/i);
   });
 
-  it('ignores empty lines and numbers exported actions', () => {
-    expect(formatProject([
+  it('ignores empty lines and numbers exported actions within each phrase', () => {
+    const firstPhrase = { id: 'phrase-1', end: 2.5, lines: [
       line(),
       line({ id: 'empty', attacker: '', handMovement: '', footMovement: '', details: '', defender: '' }),
       line({ id: 'two', attacker: 'B', handMovement: 'Riposte', footMovement: 'Marche', details: 'en avançant', defender: 'A', defenderMovement: 'Esquive', defenderDetails: 'sur le côté' }),
-    ])).toBe('1. Combattant A Parade\n2. B Riposte Marche en avançant contre A qui Esquive sur le côté');
+    ] };
+    const emptyPhrase = { id: 'phrase-2', end: 3, lines: [] };
+    const thirdPhrase = { id: 'phrase-3', end: 4, lines: [line({ id: 'three', attacker: 'C' })] };
+    expect(formatProject({ fighters: [], phrases: [firstPhrase, emptyPhrase, thirdPhrase] })).toBe(
+      '0.0 - Début Phrase 1\n1.1 - Combattant A Parade\n1.2 - B Riposte Marche en avançant contre A qui Esquive sur le côté\n2.5 - Fin Phrase 1\n\n3.0 - Début Phrase 3\n3.1 - C Parade\n4.0 - Fin Phrase 3',
+    );
   });
 
   it('exports reaction movement or detail only when a defender is present', () => {
-    expect(formatProject([line({ defender: 'B', defenderDetails: 'se protège' })])).toBe('1. Combattant A Parade contre B qui se protège');
-    expect(formatProject([line({ defender: 'B', defenderMovement: 'Parade' })])).toBe('1. Combattant A Parade contre B qui Parade');
-    expect(formatProject([line({ defender: '', defenderMovement: 'Parade', defenderDetails: 'se protège' })])).toBe('1. Combattant A Parade');
+    expect(formatProject(draftWithLines([line({ defender: 'B', defenderDetails: 'se protège' })]))).toBe('0.0 - Début Phrase 1\n1.1 - Combattant A Parade contre B qui se protège\n0.0 - Fin Phrase 1');
+    expect(formatProject(draftWithLines([line({ defender: 'B', defenderMovement: 'Parade' })]))).toContain('1.1 - Combattant A Parade contre B qui Parade');
+    expect(formatProject(draftWithLines([line({ defender: '', defenderMovement: 'Parade', defenderDetails: 'se protège' })]))).toContain('1.1 - Combattant A Parade');
   });
 
   it('requires an attacker and at least one movement on each started line', () => {
-    expect(getExportError([line(), line({ id: 'empty', attacker: '', handMovement: '', footMovement: '', details: '', defender: '' })])).toBeNull();
-    expect(getExportError([line({ attacker: '', details: 'en reculant' })])).toMatch(/attaquant/i);
-    expect(getExportError([line({ handMovement: '', details: 'en reculant' })])).toMatch(/mouvement de main ou de pieds/i);
-    expect(getExportError([line({ id: 'empty', attacker: '', handMovement: '', footMovement: '', details: '', defender: '' }), line({ id: 'second', handMovement: '', footMovement: '' })])).toMatch(/ligne 2/i);
-    expect(getExportError([line({ handMovement: '', footMovement: 'Retraite' })])).toBeNull();
+    expect(getExportError(draftWithLines([line(), line({ id: 'empty', attacker: '', handMovement: '', footMovement: '', details: '', defender: '' })]))).toBeNull();
+    expect(getExportError(draftWithLines([line({ attacker: '', details: 'en reculant' })]))).toMatch(/attaquant/i);
+    expect(getExportError(draftWithLines([line({ handMovement: '', details: 'en reculant' })]))).toMatch(/mouvement de main ou de pieds/i);
+    expect(getExportError(draftWithLines([line({ id: 'empty', attacker: '', handMovement: '', footMovement: '', details: '', defender: '' }), line({ id: 'second', handMovement: '', footMovement: '' })]))).toMatch(/ligne 1\.2/i);
+    expect(getExportError(draftWithLines([line({ handMovement: '', footMovement: 'Retraite' })]))).toBeNull();
   });
 
   it('normalizes fields as single-line text without treating markup as executable', () => {
@@ -61,7 +72,9 @@ describe('project formatting and validation', () => {
   });
 
   it('rejects malformed or oversized persisted drafts', () => {
-    expect(isProjectDraft({ fighters: [], lines: [{ id: 'a', attacker: 'x\ny', handMovement: '', footMovement: '', details: '', defender: '' }] })).toBe(false);
+    expect(isProjectDraft({ fighters: [], phrases: [{ id: 'phrase-1', end: 0, lines: [{ ...line(), attacker: 'x\ny' }] }] })).toBe(false);
+    expect(isProjectDraft({ fighters: [], phrases: [] })).toBe(false);
+    expect(isProjectDraft({ fighters: [], phrases: [{ id: 'phrase-1', end: 1, lines: [] }, { id: 'phrase-2', end: 0, lines: [] }] })).toBe(false);
     expect(isProjectDraft({ fighters: Array(51).fill('x'), lines: [] })).toBe(false);
   });
 
@@ -75,7 +88,7 @@ describe('project formatting and validation', () => {
   });
 
   it('reads a valid saved draft from the expected storage key', () => {
-    const saved = { fighters: ['A'], lines: [line()] };
+    const saved = { fighters: ['A'], phrases: [{ id: 'phrase-1', end: 0, lines: [line()] }] };
     const loaded = loadDraft({ getItem: (key) => key === STORAGE_KEY ? JSON.stringify(saved) : null, setItem: () => undefined, removeItem: () => undefined });
     expect(loaded.draft).toEqual(saved);
     expect(loaded.warning).toBeNull();
@@ -97,10 +110,11 @@ describe('project formatting and validation', () => {
       ],
     };
     const migrated = migrateLegacyDraft(legacy, categories);
-    expect(migrated.lines[0]).toMatchObject({ handMovement: '', footMovement: 'Marche' });
-    expect(migrated.lines[1]).toMatchObject({ handMovement: 'Parade', footMovement: '' });
-    expect(migrated.lines[2]).toMatchObject({ handMovement: 'Supernova', footMovement: '' });
-    expect(migrated.lines[3]).toMatchObject({ handMovement: 'Mouvement libre', footMovement: '' });
+    expect(migrated.phrases).toHaveLength(1);
+    expect(migrated.phrases[0].lines[0]).toMatchObject({ handMovement: '', footMovement: 'Marche' });
+    expect(migrated.phrases[0].lines[1]).toMatchObject({ handMovement: 'Parade', footMovement: '' });
+    expect(migrated.phrases[0].lines[2]).toMatchObject({ handMovement: 'Supernova', footMovement: '' });
+    expect(migrated.phrases[0].lines[3]).toMatchObject({ handMovement: 'Mouvement libre', footMovement: '' });
   });
 
   it('persists the migrated draft under v3 before removing the v1 key', () => {
@@ -115,13 +129,13 @@ describe('project formatting and validation', () => {
     };
     const loaded = loadDraft(storage, new Map([['marche', 'pieds']]));
     expect(loaded.migrated).toBe(true);
-    expect(loaded.draft.lines[0].footMovement).toBe('Marche');
+    expect(loaded.draft.phrases[0].lines[0].footMovement).toBe('Marche');
     expect(values.has(STORAGE_KEY)).toBe(true);
     expect(values.has(LEGACY_STORAGE_KEY)).toBe(false);
   });
 
   it('migrates v2 drafts by adding empty defender reaction fields', () => {
-    const values = new Map([[PREVIOUS_STORAGE_KEY, JSON.stringify({
+    const values = new Map([[OLDER_STORAGE_KEY, JSON.stringify({
       fighters: ['A', 'B'],
       lines: [{ id: 'prior', attacker: 'A', handMovement: 'Parade', footMovement: '', details: '', defender: 'B' }],
     })]]);
@@ -131,7 +145,22 @@ describe('project formatting and validation', () => {
       removeItem: (key: string) => { values.delete(key); },
     };
     const loaded = loadDraft(storage);
-    expect(loaded.draft.lines[0]).toMatchObject({ defender: 'B', defenderMovement: '', defenderDetails: '' });
+    expect(loaded.draft.phrases[0].lines[0]).toMatchObject({ defender: 'B', defenderMovement: '', defenderDetails: '' });
+    expect(values.has(STORAGE_KEY)).toBe(true);
+    expect(values.has(OLDER_STORAGE_KEY)).toBe(false);
+  });
+
+  it('migrates v3 lines into the first parent phrase', () => {
+    const values = new Map([[PREVIOUS_STORAGE_KEY, JSON.stringify({ fighters: ['A'], lines: [line()] })]]);
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value); },
+      removeItem: (key: string) => { values.delete(key); },
+    };
+    const loaded = loadDraft(storage);
+    expect(loaded.migrated).toBe(true);
+    expect(loaded.draft.phrases).toHaveLength(1);
+    expect(loaded.draft.phrases[0].lines).toHaveLength(1);
     expect(values.has(STORAGE_KEY)).toBe(true);
     expect(values.has(PREVIOUS_STORAGE_KEY)).toBe(false);
   });

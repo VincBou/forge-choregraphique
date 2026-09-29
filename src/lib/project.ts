@@ -1,5 +1,6 @@
-export const STORAGE_KEY = 'forgechoree.project.v3';
-export const PREVIOUS_STORAGE_KEY = 'forgechoree.project.v2';
+export const STORAGE_KEY = 'forgechoree.project.v4';
+export const PREVIOUS_STORAGE_KEY = 'forgechoree.project.v3';
+export const OLDER_STORAGE_KEY = 'forgechoree.project.v2';
 export const LEGACY_STORAGE_KEY = 'forgechoree.project.v1';
 export const MAX_NAME_LENGTH = 100;
 export const MAX_DETAILS_LENGTH = 500;
@@ -19,10 +20,18 @@ export type ChoreographyLine = {
   defenderDetails: string;
 };
 
-export type ProjectDraft = {
-  fighters: string[];
+export type PhraseDArmes = {
+  id: string;
+  end: number;
   lines: ChoreographyLine[];
 };
+
+export type ProjectDraft = {
+  fighters: string[];
+  phrases: PhraseDArmes[];
+};
+
+type V3ProjectDraft = { fighters: string[]; lines: ChoreographyLine[] };
 
 type LegacyChoreographyLine = {
   id: string;
@@ -37,14 +46,18 @@ type LegacyProjectDraft = {
   lines: LegacyChoreographyLine[];
 };
 
-type PreviousChoreographyLine = Omit<ChoreographyLine, 'defenderMovement' | 'defenderDetails'>;
-type PreviousProjectDraft = { fighters: string[]; lines: PreviousChoreographyLine[] };
+type V2ChoreographyLine = Omit<ChoreographyLine, 'defenderMovement' | 'defenderDetails'>;
+type V2ProjectDraft = { fighters: string[]; lines: V2ChoreographyLine[] };
 
 type DraftStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 export const defaultDraft = (): ProjectDraft => ({
   fighters: ['Combattant A', 'Combattant B'],
-  lines: [{ id: createLineId(), attacker: '', handMovement: '', footMovement: '', details: '', defender: '', defenderMovement: '', defenderDetails: '' }],
+  phrases: [{
+    id: createLineId(),
+    end: 0,
+    lines: [{ id: createLineId(), attacker: '', handMovement: '', footMovement: '', details: '', defender: '', defenderMovement: '', defenderDetails: '' }],
+  }],
 });
 
 export function createLineId(): string {
@@ -78,20 +91,15 @@ function isValidLineId(value: unknown, ids: Set<string>): value is string {
   return true;
 }
 
-function isValidDraftBase(value: unknown): value is { fighters: string[]; lines: unknown[] } {
+function isValidFighters(value: unknown): value is string[] {
   if (!value || typeof value !== 'object') return false;
-  const candidate = value as { fighters?: unknown; lines?: unknown };
+  const candidate = value as { fighters?: unknown };
   return Array.isArray(candidate.fighters)
-    && Array.isArray(candidate.lines)
     && candidate.fighters.length <= MAX_FIGHTERS
-    && candidate.lines.length <= MAX_LINES
     && candidate.fighters.every((fighter) => isValidText(fighter, MAX_NAME_LENGTH));
 }
 
-export function isProjectDraft(value: unknown): value is ProjectDraft {
-  if (!isValidDraftBase(value)) return false;
-  const ids = new Set<string>();
-  return value.lines.every((line) => {
+function isValidChoreographyLine(line: unknown, ids: Set<string>): line is ChoreographyLine {
     if (!line || typeof line !== 'object') return false;
     const row = line as ChoreographyLine;
     return isValidLineId(row.id, ids)
@@ -102,15 +110,45 @@ export function isProjectDraft(value: unknown): value is ProjectDraft {
       && isValidText(row.details, MAX_DETAILS_LENGTH)
       && isValidText(row.defenderMovement, MAX_NAME_LENGTH)
       && isValidText(row.defenderDetails, MAX_DETAILS_LENGTH);
+}
+
+function isV3ProjectDraft(value: unknown): value is V3ProjectDraft {
+  if (!isValidFighters(value)) return false;
+  const candidate = value as { lines?: unknown };
+  if (!Array.isArray(candidate.lines) || candidate.lines.length > MAX_LINES) return false;
+  const ids = new Set<string>();
+  return candidate.lines.every((line) => isValidChoreographyLine(line, ids));
+}
+
+export function isProjectDraft(value: unknown): value is ProjectDraft {
+  if (!isValidFighters(value)) return false;
+  const candidate = value as { phrases?: unknown };
+  if (!Array.isArray(candidate.phrases) || candidate.phrases.length === 0) return false;
+  let totalLines = 0;
+  const ids = new Set<string>();
+  let previousEnd = 0;
+  return candidate.phrases.every((phrase) => {
+    if (!phrase || typeof phrase !== 'object') return false;
+    const row = phrase as PhraseDArmes;
+    if (!isValidLineId(row.id, ids)
+      || typeof row.end !== 'number'
+      || !Number.isFinite(row.end)
+      || row.end < previousEnd
+      || !Array.isArray(row.lines)) return false;
+    previousEnd = row.end;
+    totalLines += row.lines.length;
+    return totalLines <= MAX_LINES && row.lines.every((line) => isValidChoreographyLine(line, ids));
   });
 }
 
-function isPreviousProjectDraft(value: unknown): value is PreviousProjectDraft {
-  if (!isValidDraftBase(value)) return false;
+function isV2ProjectDraft(value: unknown): value is V2ProjectDraft {
+  if (!isValidFighters(value)) return false;
+  const candidate = value as { lines?: unknown };
+  if (!Array.isArray(candidate.lines) || candidate.lines.length > MAX_LINES) return false;
   const ids = new Set<string>();
-  return value.lines.every((line) => {
+  return candidate.lines.every((line) => {
     if (!line || typeof line !== 'object') return false;
-    const row = line as PreviousChoreographyLine;
+    const row = line as V2ChoreographyLine;
     return isValidLineId(row.id, ids)
       && isValidText(row.attacker, MAX_NAME_LENGTH)
       && isValidText(row.handMovement, MAX_NAME_LENGTH)
@@ -120,17 +158,19 @@ function isPreviousProjectDraft(value: unknown): value is PreviousProjectDraft {
   });
 }
 
-function migratePreviousDraft(previous: PreviousProjectDraft): ProjectDraft {
+function wrapLinesInFirstPhrase(fighters: string[], lines: ChoreographyLine[]): ProjectDraft {
   return {
-    fighters: [...previous.fighters],
-    lines: previous.lines.map((line) => ({ ...line, defenderMovement: '', defenderDetails: '' })),
+    fighters: [...fighters],
+    phrases: [{ id: createLineId(), end: 0, lines: lines.map((line) => ({ ...line })) }],
   };
 }
 
 function isLegacyProjectDraft(value: unknown): value is LegacyProjectDraft {
-  if (!isValidDraftBase(value)) return false;
+  if (!isValidFighters(value)) return false;
+  const candidate = value as { lines?: unknown };
+  if (!Array.isArray(candidate.lines) || candidate.lines.length > MAX_LINES) return false;
   const ids = new Set<string>();
-  return value.lines.every((line) => {
+  return candidate.lines.every((line) => {
     if (!line || typeof line !== 'object') return false;
     const row = line as LegacyChoreographyLine;
     return isValidLineId(row.id, ids)
@@ -145,9 +185,7 @@ export function migrateLegacyDraft(
   legacy: LegacyProjectDraft,
   movementCategories: ReadonlyMap<string, MovementCategory>,
 ): ProjectDraft {
-  return {
-    fighters: [...legacy.fighters],
-    lines: legacy.lines.map(({ action, ...line }) => {
+  const lines = legacy.lines.map(({ action, ...line }) => {
       const category = movementCategories.get(normalizeSearch(action.trim())) ?? 'main';
       return {
         ...line,
@@ -156,8 +194,8 @@ export function migrateLegacyDraft(
         defenderMovement: '',
         defenderDetails: '',
       };
-    }),
-  };
+    });
+  return wrapLinesInFirstPhrase(legacy.fighters, lines);
 }
 
 export type LoadedDraft = { draft: ProjectDraft; warning: string | null; migrated: boolean };
@@ -182,17 +220,34 @@ export function loadDraft(
       }
     }
 
-    const previousRaw = target.getItem(PREVIOUS_STORAGE_KEY);
-    if (previousRaw !== null) {
-      let previous: unknown = null;
-      try { previous = JSON.parse(previousRaw); } catch { /* Try the older draft format below. */ }
-      if (isPreviousProjectDraft(previous)) {
-        const draft = migratePreviousDraft(previous);
+    const v3Raw = target.getItem(PREVIOUS_STORAGE_KEY);
+    if (v3Raw !== null) {
+      let v3: unknown = null;
+      try { v3 = JSON.parse(v3Raw); } catch { /* Try the older draft formats below. */ }
+      if (isV3ProjectDraft(v3)) {
+        const draft = wrapLinesInFirstPhrase(v3.fighters, v3.lines);
         try {
           target.setItem(STORAGE_KEY, JSON.stringify(draft));
           target.removeItem(PREVIOUS_STORAGE_KEY);
         } catch {
-          return { draft, warning: 'Le brouillon a Ã©tÃ© converti, mais nâ€™a pas pu Ãªtre enregistrÃ© dans le stockage local.', migrated: true };
+          return { draft, warning: 'Le brouillon a été converti, mais n’a pas pu être enregistré dans le stockage local.', migrated: true };
+        }
+        return { draft, warning: null, migrated: true };
+      }
+    }
+
+    const v2Raw = target.getItem(OLDER_STORAGE_KEY);
+    if (v2Raw !== null) {
+      let v2: unknown = null;
+      try { v2 = JSON.parse(v2Raw); } catch { /* Try the older draft format below. */ }
+      if (isV2ProjectDraft(v2)) {
+        const lines = v2.lines.map((line) => ({ ...line, defenderMovement: '', defenderDetails: '' }));
+        const draft = wrapLinesInFirstPhrase(v2.fighters, lines);
+        try {
+          target.setItem(STORAGE_KEY, JSON.stringify(draft));
+          target.removeItem(OLDER_STORAGE_KEY);
+        } catch {
+          return { draft, warning: 'Le brouillon a été converti, mais n’a pas pu être enregistré dans le stockage local.', migrated: true };
         }
         return { draft, warning: null, migrated: true };
       }
@@ -214,7 +269,7 @@ export function loadDraft(
       return { draft, warning: null, migrated: true };
     }
 
-    if (currentInvalid || previousRaw !== null) {
+    if (currentInvalid || v3Raw !== null || v2Raw !== null) {
       return { draft: defaultDraft(), warning: 'Le brouillon enregistré est invalide. Un nouveau projet a été ouvert.', migrated: false };
     }
     return { draft: defaultDraft(), warning: null, migrated: false };
@@ -227,28 +282,54 @@ function isLineStarted(line: ChoreographyLine): boolean {
   return [line.attacker, line.handMovement, line.footMovement, line.details, line.defender, line.defenderMovement, line.defenderDetails].some((part) => part.trim());
 }
 
-export function getExportError(lines: ChoreographyLine[]): string | null {
+function allLines(draft: ProjectDraft): ChoreographyLine[] {
+  return draft.phrases.flatMap((phrase) => phrase.lines);
+}
+
+export function getExportError(draft: ProjectDraft): string | null {
+  const lines = allLines(draft);
   if (!lines.some(isLineStarted)) return 'Ajoutez au moins une action avant de télécharger le projet.';
-  const invalid = lines.findIndex((line) => isLineStarted(line)
-    && (!line.attacker.trim() || (!line.handMovement.trim() && !line.footMovement.trim())));
-  if (invalid >= 0) {
+  for (const [phraseIndex, phrase] of draft.phrases.entries()) {
+    const invalid = phrase.lines.findIndex((line) => isLineStarted(line)
+      && (!line.attacker.trim() || (!line.handMovement.trim() && !line.footMovement.trim())));
+    if (invalid < 0) continue;
     const missing = [
-      !lines[invalid].attacker.trim() && 'attaquant',
-      !lines[invalid].handMovement.trim() && !lines[invalid].footMovement.trim() && 'mouvement de main ou de pieds',
+      !phrase.lines[invalid].attacker.trim() && 'attaquant',
+      !phrase.lines[invalid].handMovement.trim() && !phrase.lines[invalid].footMovement.trim() && 'mouvement de main ou de pieds',
     ].filter(Boolean);
-    return `La ligne ${invalid + 1} doit contenir ${missing.join(' et ')}.`;
+    return `La ligne ${phraseIndex + 1}.${invalid + 1} doit contenir ${missing.join(' et ')}.`;
   }
   return null;
 }
 
-export function formatProject(lines: ChoreographyLine[]): string {
-  return lines.filter(isLineStarted).map((line, index) => {
+function formatTime(value: number): string {
+  return Number.isInteger(value) ? value.toFixed(1) : String(value);
+}
+
+function formatLine(line: ChoreographyLine): string {
     const details = line.details.trim();
     const defender = line.defender.trim();
     const movements = [line.handMovement.trim(), line.footMovement.trim()].filter(Boolean).join(' ');
     const reaction = defender
       ? [line.defenderMovement.trim(), line.defenderDetails.trim()].filter(Boolean).join(' ')
       : '';
-    return `${index + 1}. ${line.attacker.trim()} ${movements}${details ? ` ${details}` : ''}${defender ? ` contre ${defender}${reaction ? ` qui ${reaction}` : ''}` : ''}`;
-  }).join('\n');
+  return `${line.attacker.trim()} ${movements}${details ? ` ${details}` : ''}${defender ? ` contre ${defender}${reaction ? ` qui ${reaction}` : ''}` : ''}`;
+}
+
+export function formatProject(draft: ProjectDraft): string {
+  const output: string[] = [];
+  let start = 0;
+  for (const [phraseIndex, phrase] of draft.phrases.entries()) {
+    const lines = phrase.lines.filter(isLineStarted);
+    if (lines.length) {
+      const number = phraseIndex + 1;
+      output.push(`${formatTime(start)} - Début Phrase ${number}`);
+      lines.forEach((line, index) => output.push(`${number}.${index + 1} - ${formatLine(line)}`));
+      output.push(`${formatTime(phrase.end)} - Fin Phrase ${number}`);
+      output.push('');
+    }
+    start = phrase.end;
+  }
+  if (output.at(-1) === '') output.pop();
+  return output.join('\n');
 }
