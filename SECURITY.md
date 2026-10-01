@@ -1,11 +1,11 @@
 # Sécurité de Forge Chorée
 
-La V0 est une application statique sans compte, API, authentification ni serveur applicatif. Elle n’enregistre aucun secret. Le brouillon reste dans `localStorage`, qui est accessible aux scripts exécutés sur la même origine et lisible par une personne ayant accès au profil du navigateur. Ne saisissez donc pas d’informations sensibles.
+La V0 est une application statique sans compte, API, authentification ni serveur applicatif. Le brouillon, notamment les licences et coordonnées d’identité saisies, reste dans `localStorage`, accessible aux scripts exécutés sur la même origine et à toute personne ayant accès au profil du navigateur. Le stockage n’est pas chiffré ; évitez les informations confidentielles.
 
 ## Mesures de développement
 
 - Les saisies, mouvements et données locales sont affichés comme du texte. Ne pas ajouter `dangerouslySetInnerHTML`, `innerHTML`, `eval` ou une interprétation HTML des données.
-- Les champs sont limités à 100 caractères (noms et mouvements de main/pieds) ou 500 caractères (détails), sans retours à la ligne. Toute donnée relue depuis `localStorage` est validée avant usage.
+- Les champs courts sont limités à 100 caractères, les durées à 30, les détails à 500 et les informations générales multiligne à 5 000. Seul le champ d’informations générales accepte les retours à la ligne. Toute donnée relue depuis `localStorage` est validée avant usage.
 - Le JSON du lexique est validé au chargement. Les erreurs de stockage sont interceptées et signalées sans afficher de contenu du brouillon.
 - Les dépendances sont verrouillées dans `package-lock.json`. Lancer `npm run security:audit` pour rechercher les avis de vulnérabilité npm avant une livraison.
 - Le build ajoute une politique CSP de production. Elle limite les scripts, styles, polices, connexions et images à la même origine et bloque les objets intégrés.

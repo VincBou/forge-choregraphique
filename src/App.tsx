@@ -4,6 +4,7 @@ import AutocompleteInput from './components/AutocompleteInput';
 import GuidedTour from './components/GuidedTour';
 import {
   createLineId,
+  calculateOppositionDuration,
   defaultDraft,
   formatProject,
   getExportError,
@@ -12,13 +13,21 @@ import {
   OLDER_STORAGE_KEY,
   PREVIOUS_STORAGE_KEY,
   MAX_DETAILS_LENGTH,
+  MAX_PROJECT_INFO_LENGTH,
+  MAX_DURATION_LENGTH,
+  MAX_ASSISTANTS,
   MAX_FIGHTERS,
   MAX_LINES,
   MAX_NAME_LENGTH,
   normalizeSearch,
+  normalizeMultiLine,
   normalizeSingleLine,
   STORAGE_KEY,
+  V4_STORAGE_KEY,
   type ChoreographyLine,
+  type Fighter,
+  type Assistant,
+  type ProjectInfo,
   type MovementCategory,
 } from './lib/project';
 
@@ -45,6 +54,7 @@ const getCharacteristics = (...names: string[]) => [...new Set(names.flatMap((na
 const movementCategories = new Map(movementList.map((movement) => [normalizeSearch(movement.nom), movement.categorie]));
 const initialState = loadDraft(undefined, movementCategories);
 const createEmptyLine = (): ChoreographyLine => ({ id: createLineId(), attacker: '', handMovement: '', footMovement: '', details: '', defender: '', defenderMovement: '', defenderDetails: '' });
+const createEmptyAssistant = (): Assistant => ({ id: createLineId(), firstName: '', lastName: '', licenseNumber: '', role: '' });
 const phraseStart = (phrases: typeof initialState.draft.phrases, index: number) => index === 0 ? 0 : phrases[index - 1].end;
 const formatTiming = (value: number) => Number.isInteger(value) ? value.toFixed(1) : String(value);
 
@@ -53,22 +63,27 @@ export default function App() {
   const [notice, setNotice] = useState(initialState.warning);
   const [exportError, setExportError] = useState<string | null>(null);
   const [openDescription, setOpenDescription] = useState<string | null>(null);
-  const [fighterEdits, setFighterEdits] = useState<Record<number, string>>({});
+  const [fighterEdits, setFighterEdits] = useState<Record<string, string>>({});
   const [timingEdits, setTimingEdits] = useState<Record<string, string>>({});
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [tourOpen, setTourOpen] = useState(false);
   const hasEdited = useRef(false);
-  const fighterSuggestions = useMemo(() => draft.fighters.filter(Boolean), [draft.fighters]);
+  const fighterSuggestions = useMemo(() => draft.fighters.map((fighter) => fighter.name).filter(Boolean), [draft.fighters]);
   const movementSuggestions = useMemo(() => movementList.map((movement) => movement.nom), []);
   const handSuggestions = useMemo(() => movementList.filter((movement) => movement.categorie === 'main' || movement.categorie === 'combine').map((movement) => movement.nom), []);
   const footSuggestions = useMemo(() => movementList.filter((movement) => movement.categorie === 'pieds').map((movement) => movement.nom), []);
+  const projectCategory = draft.fighters.length === 0
+    ? 'Non définie'
+    : draft.fighters.length === 1 ? 'Kata'
+      : draft.fighters.length === 2 ? 'Duel'
+        : draft.info.ensemble ? 'Ensemble' : 'Bataille';
 
   useEffect(() => {
     if (!hasEdited.current) return;
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
     } catch {
-      setNotice('Impossible d’enregistrer le brouillon dans ce navigateur. Téléchargez le projet pour le conserver.');
+      setNotice('Impossible d’enregistrer le brouillon dans ce navigateur. Copiez les informations du projet avant de fermer cette page.');
     }
   }, [draft]);
 
@@ -78,39 +93,60 @@ export default function App() {
     setNotice(null);
   }
 
-  function updateFighterEdit(index: number, value: string) {
-    setFighterEdits((edits) => ({ ...edits, [index]: value }));
+  function updateFighterEdit(id: string, value: string) {
+    setFighterEdits((edits) => ({ ...edits, [id]: value }));
   }
 
-  function commitFighterEdit(index: number) {
-    const editedName = fighterEdits[index];
+  function commitFighterEdit(id: string) {
+    const editedName = fighterEdits[id];
     if (editedName === undefined) return;
-
     const newName = normalizeSingleLine(editedName, MAX_NAME_LENGTH);
-    const oldName = draft.fighters[index];
-    setFighterEdits(({ [index]: _discarded, ...edits }) => edits);
-
-    if (!newName.trim() || oldName === newName) return;
-
-    const fighters = [...draft.fighters];
-    fighters[index] = newName;
-    const phrases = oldName ? draft.phrases.map((phrase) => ({
+    const fighter = draft.fighters.find((candidate) => candidate.id === id);
+    setFighterEdits(({ [id]: _discarded, ...edits }) => edits);
+    if (!fighter || !newName.trim() || fighter.name === newName) return;
+    const fighters = draft.fighters.map((candidate) => candidate.id === id ? { ...candidate, name: newName } : candidate);
+    const phrases = fighter.name ? draft.phrases.map((phrase) => ({
       ...phrase,
       lines: phrase.lines.map((line) => ({
         ...line,
-        attacker: line.attacker === oldName ? newName : line.attacker,
-        defender: line.defender === oldName ? newName : line.defender,
+        attacker: line.attacker === fighter.name ? newName : line.attacker,
+        defender: line.defender === fighter.name ? newName : line.defender,
       })),
     })) : draft.phrases;
     changeDraft({ ...draft, fighters, phrases });
   }
 
   function addFighter() {
-    if (draft.fighters.length < MAX_FIGHTERS) changeDraft({ ...draft, fighters: [...draft.fighters, ''] });
+    if (draft.fighters.length < MAX_FIGHTERS) changeDraft({ ...draft, fighters: [...draft.fighters, { id: createLineId(), name: '', firstName: '', lastName: '', licenseNumber: '', captain: false }] });
   }
 
-  function removeFighter(index: number) {
-    changeDraft({ ...draft, fighters: draft.fighters.filter((_, fighterIndex) => fighterIndex !== index) });
+  function removeFighter(id: string) {
+    changeDraft({ ...draft, fighters: draft.fighters.filter((fighter) => fighter.id !== id) });
+    setFighterEdits(({ [id]: _discarded, ...edits }) => edits);
+  }
+
+  function updateProjectInfo<K extends keyof ProjectInfo>(field: K, value: ProjectInfo[K]) {
+    changeDraft({ ...draft, info: { ...draft.info, [field]: value } });
+  }
+
+  function updateFighter(id: string, field: keyof Omit<Fighter, 'id' | 'name'>, value: string | boolean) {
+    changeDraft({ ...draft, fighters: draft.fighters.map((fighter) => fighter.id === id ? { ...fighter, [field]: value } : fighter) });
+  }
+
+  function addAssistant() {
+    if (draft.assistants.length < MAX_ASSISTANTS) changeDraft({ ...draft, assistants: [...draft.assistants, createEmptyAssistant()] });
+  }
+
+  function updateAssistant(id: string, field: keyof Omit<Assistant, 'id'>, value: string) {
+    changeDraft({ ...draft, assistants: draft.assistants.map((assistant) => assistant.id === id ? { ...assistant, [field]: normalizeSingleLine(value, MAX_NAME_LENGTH) } : assistant) });
+  }
+
+  function removeAssistant(id: string) {
+    changeDraft({ ...draft, assistants: draft.assistants.filter((assistant) => assistant.id !== id) });
+  }
+
+  function calculateOppositionTime() {
+    updateProjectInfo('oppositionDuration', calculateOppositionDuration(draft));
   }
 
   function updateLine(id: string, field: keyof Omit<ChoreographyLine, 'id'>, value: string) {
@@ -253,6 +289,7 @@ export default function App() {
     let cleared = false;
     try {
       window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(V4_STORAGE_KEY);
       window.localStorage.removeItem(PREVIOUS_STORAGE_KEY);
       window.localStorage.removeItem(OLDER_STORAGE_KEY);
       window.localStorage.removeItem(LEGACY_STORAGE_KEY);
@@ -292,30 +329,64 @@ export default function App() {
             </div>
             <div className="fighter-list">
               {draft.fighters.map((fighter, index) => (
-                <div className="fighter-row" key={`fighter-${index}`}>
-                  <span className="fighter-dot" aria-hidden="true" />
-                  <input
-                    aria-label={`Nom du combattant ${index + 1}`}
-                    value={fighterEdits[index] ?? fighter}
-                    maxLength={MAX_NAME_LENGTH}
-                    autoComplete="off"
-                    placeholder={`Combattant ${String.fromCharCode(65 + (index % 26))}`}
-                    onFocus={() => updateFighterEdit(index, fighter)}
-                    onChange={(event) => updateFighterEdit(index, event.target.value)}
-                    onBlur={() => commitFighterEdit(index)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        commitFighterEdit(index);
-                      }
-                    }}
-                  />
-                  <button className="icon-button remove-fighter" type="button" aria-label={`Supprimer le combattant ${index + 1}`} onClick={() => removeFighter(index)}>×</button>
+                <div className="fighter-card" key={fighter.id}>
+                  <div className="fighter-row">
+                    <span className="fighter-dot" aria-hidden="true" />
+                    <input
+                      aria-label={`Nom du combattant ${index + 1}`}
+                      value={fighterEdits[fighter.id] ?? fighter.name}
+                      maxLength={MAX_NAME_LENGTH}
+                      autoComplete="off"
+                      placeholder={`Combattant ${String.fromCharCode(65 + (index % 26))}`}
+                      onFocus={() => updateFighterEdit(fighter.id, fighter.name)}
+                      onChange={(event) => updateFighterEdit(fighter.id, event.target.value)}
+                      onBlur={() => commitFighterEdit(fighter.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          commitFighterEdit(fighter.id);
+                        }
+                      }}
+                    />
+                    <button className="icon-button remove-fighter" type="button" aria-label={`Supprimer le combattant ${index + 1}`} onClick={() => removeFighter(fighter.id)}>×</button>
+                  </div>
+                  <details className="participant-details">
+                    <summary aria-label={`Identité du combattant ${index + 1}`}>Fiche FFE</summary>
+                    <div className="participant-fields">
+                      <label>Prénom<input aria-label={`Prénom du combattant ${index + 1}`} maxLength={MAX_NAME_LENGTH} value={fighter.firstName} onChange={(event) => updateFighter(fighter.id, 'firstName', normalizeSingleLine(event.target.value, MAX_NAME_LENGTH))} /></label>
+                      <label>Nom<input aria-label={`Nom de famille du combattant ${index + 1}`} maxLength={MAX_NAME_LENGTH} value={fighter.lastName} onChange={(event) => updateFighter(fighter.id, 'lastName', normalizeSingleLine(event.target.value, MAX_NAME_LENGTH))} /></label>
+                      <label>Licence FFE<input aria-label={`Licence FFE du combattant ${index + 1}`} maxLength={MAX_NAME_LENGTH} value={fighter.licenseNumber} onChange={(event) => updateFighter(fighter.id, 'licenseNumber', normalizeSingleLine(event.target.value, MAX_NAME_LENGTH))} /></label>
+                      <label className="participant-checkbox"><input type="checkbox" checked={fighter.captain} onChange={(event) => updateFighter(fighter.id, 'captain', event.target.checked)} /> Capitaine</label>
+                    </div>
+                  </details>
                 </div>
               ))}
             </div>
             <button className="text-button add-fighter" type="button" disabled={draft.fighters.length >= MAX_FIGHTERS} onClick={addFighter}><span aria-hidden="true">＋</span> Ajouter un combattant</button>
             <p className="hint">Les noms restent modifiables directement dans la liste.</p>
+          </section>
+
+          <section className="panel assistants-panel" data-tour="assistants">
+            <div className="section-heading">
+              <div><p className="eyebrow">ÉQUIPE</p><h2>Assistants / Figurants</h2></div>
+              <span className="count-badge">{draft.assistants.length}</span>
+            </div>
+            <div className="assistant-list">
+              {draft.assistants.map((assistant, index) => (
+                <details className="assistant-card participant-details" key={assistant.id}>
+                  <summary aria-label={`Fiche de l’assistant ${index + 1}`}>{[assistant.firstName, assistant.lastName].filter(Boolean).join(' ') || `Assistant ${index + 1}`}</summary>
+                  <div className="participant-fields">
+                    <label>Prénom<input aria-label={`Prénom de l’assistant ${index + 1}`} maxLength={MAX_NAME_LENGTH} value={assistant.firstName} onChange={(event) => updateAssistant(assistant.id, 'firstName', event.target.value)} /></label>
+                    <label>Nom<input aria-label={`Nom de famille de l’assistant ${index + 1}`} maxLength={MAX_NAME_LENGTH} value={assistant.lastName} onChange={(event) => updateAssistant(assistant.id, 'lastName', event.target.value)} /></label>
+                    <label>Licence FFE<input aria-label={`Licence FFE de l’assistant ${index + 1}`} maxLength={MAX_NAME_LENGTH} value={assistant.licenseNumber} onChange={(event) => updateAssistant(assistant.id, 'licenseNumber', event.target.value)} /></label>
+                    <label>Rôle<input aria-label={`Rôle de l’assistant ${index + 1}`} maxLength={MAX_NAME_LENGTH} placeholder="Narrateur, figurant…" value={assistant.role} onChange={(event) => updateAssistant(assistant.id, 'role', event.target.value)} /></label>
+                    <button className="text-button remove-assistant" type="button" onClick={() => removeAssistant(assistant.id)}>Supprimer cet assistant</button>
+                  </div>
+                </details>
+              ))}
+            </div>
+            <button className="text-button add-fighter" type="button" disabled={draft.assistants.length >= MAX_ASSISTANTS} onClick={addAssistant}><span aria-hidden="true">＋</span> Ajouter un assistant</button>
+            {draft.assistants.length > 0 && <p className="hint">Les assistants ne sont pas proposés dans les lignes d’action.</p>}
           </section>
 
           <section className="panel movements-panel" data-tour="movements">
@@ -360,6 +431,29 @@ export default function App() {
             </div>
             <div className="autosave" data-tour="autosave"><span className="save-dot" aria-hidden="true" /> Brouillon local</div>
           </div>
+
+          <section className="project-info" data-tour="project-info" aria-labelledby="project-info-title">
+            <div className="section-heading">
+              <div><p className="eyebrow">DOSSIER</p><h2 id="project-info-title">Informations générales</h2></div>
+              <span className="project-category">{projectCategory}</span>
+            </div>
+            <div className="project-info-grid">
+              <label>Titre de la chorégraphie<input aria-label="Titre de la chorégraphie" maxLength={MAX_NAME_LENGTH} value={draft.info.title} onChange={(event) => updateProjectInfo('title', normalizeSingleLine(event.target.value, MAX_NAME_LENGTH))} /></label>
+              <label>Club<input aria-label="Club" maxLength={MAX_NAME_LENGTH} value={draft.info.club} onChange={(event) => updateProjectInfo('club', normalizeSingleLine(event.target.value, MAX_NAME_LENGTH))} /></label>
+              <label>Durée<input aria-label="Durée" maxLength={MAX_DURATION_LENGTH} placeholder="00m:00s" value={draft.info.duration} onChange={(event) => updateProjectInfo('duration', normalizeSingleLine(event.target.value, MAX_DURATION_LENGTH))} /></label>
+              <label className="opposition-duration">Durée d’opposition
+                <span className="duration-control">
+                  <input aria-label="Durée d’opposition" maxLength={MAX_DURATION_LENGTH} placeholder="00m:00s" value={draft.info.oppositionDuration} onChange={(event) => updateProjectInfo('oppositionDuration', normalizeSingleLine(event.target.value, MAX_DURATION_LENGTH))} />
+                  <button className="icon-button calculate-duration" type="button" aria-label="Calculer la durée d’opposition" title="Calculer la durée d’opposition" onClick={calculateOppositionTime}>
+                    <img src="/resources/icons/calculator.svg" alt="" aria-hidden="true" />
+                  </button>
+                </span>
+              </label>
+              <label className="ensemble-toggle"><input type="checkbox" checked={draft.info.ensemble} onChange={(event) => updateProjectInfo('ensemble', event.target.checked)} /> Mouvement d’ensemble</label>
+            </div>
+            <label className="project-notes">Informations : intrigue, musiques…<textarea aria-label="Informations : intrigue, musiques" maxLength={MAX_PROJECT_INFO_LENGTH} rows={3} value={draft.info.notes} onChange={(event) => updateProjectInfo('notes', normalizeMultiLine(event.target.value, MAX_PROJECT_INFO_LENGTH))} /></label>
+            <p className="hint">Ces informations restent dans le brouillon de ce navigateur et ne sont pas incluses dans le téléchargement actuel.</p>
+          </section>
 
           <div className="notation-guide" aria-hidden="true">
             <span>ATTAQUANT</span><span>MOUVEMENT DE MAIN</span><span>MOUVEMENT DE PIEDS</span><span>INTENTION / DÉTAIL</span><span>DÉFENSEUR</span>

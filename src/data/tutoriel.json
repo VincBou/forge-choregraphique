@@ -2,7 +2,12 @@
   {
     "id": "fighters",
     "title": "Les combattants",
-    "text": "Ajoutez et renommez les combattants de l’équipe. Leurs noms sont proposés dans les rôles Attaquant et Défenseur, et un renommage met à jour leurs occurrences dans le projet."
+    "text": "Ajoutez et renommez les combattants de l’équipe. Leurs noms sont proposés dans les rôles Attaquant et Défenseur, et un renommage met à jour leurs occurrences dans le projet. Ouvrez une fiche FFE pour saisir l’identité et la licence."
+  },
+  {
+    "id": "assistants",
+    "title": "Les assistants et figurants",
+    "text": "Ajoutez les personnes qui accompagnent la chorégraphie, avec leur identité, leur licence et leur rôle. Ces noms restent séparés des combattants des lignes d’action."
   },
   {
     "id": "movements",
@@ -13,6 +18,11 @@
     "id": "editor",
     "title": "Le projet chorégraphique",
     "text": "Composez votre projet dans cette zone. Les lignes d’action sont regroupées en phrases d’armes et décrivent les échanges, intentions et réactions des combattants."
+  },
+  {
+    "id": "project-info",
+    "title": "Les informations générales",
+    "text": "Renseignez le titre, le club, les durées, l’intrigue et les musiques. La catégorie dépend du nombre de combattants. Le bouton calculatrice additionne la durée des phrases contenant une ligne commencée et renseigne la durée d’opposition ; vous pouvez ensuite modifier le résultat."
   },
   {
     "id": "phrases",
@@ -28,11 +38,11 @@
   {
     "id": "autosave",
     "title": "Le brouillon local",
-    "text": "Votre projet est enregistré dans le stockage de ce navigateur, sur cet appareil. Téléchargez-le pour en conserver une copie sous forme de fichier."
+    "text": "Votre projet et ses informations générales sont enregistrés dans le stockage de ce navigateur, sur cet appareil. Le téléchargement actuel contient uniquement les actions chorégraphiques."
   },
   {
     "id": "download",
     "title": "Télécharger le projet",
-    "text": "Téléchargez le projet au format texte, avec les phrases, leurs timings et les actions numérotées. Une ligne commencée doit avoir un attaquant et au moins un mouvement."
+    "text": "Téléchargez le projet au format texte, avec les phrases, leurs timings et les actions numérotées. Les informations générales et les fiches des participants ne sont pas encore dans ce fichier."
   }
 ]
