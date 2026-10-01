@@ -200,6 +200,49 @@
     "categorie": "main"
   },
   {
+    "nom": "Attaque",
+    "description": "Action offensive visant à toucher l'adversaire par la mise en mouvement de la lame vers une zone cible, avec allongement du bras. Elle se caractérise par une trajectoire et une intensité.",
+    "categorie": "main",
+    "caracteristiques": ["directe", "indirecte", "avec préparation", "simple", "composée", "avec remise", "horizontale", "verticale descendante", "verticale ascendante", "oblique descendante", "oblique ascendante", "intérieure", "extérieure", "par-dessus", "par-dessous", "légère (shim)", "modérée (cho)", "puissante (sai)"]
+  },
+  {
+    "nom": "Estoc",
+    "description": "Attaque portée avec la pointe dans un mouvement de perforation. Le livret précise qu'elle est interdite en combat sportif.",
+    "categorie": "main",
+    "caracteristiques": ["dessus", "dedans", "dehors", "dessous"]
+  },
+  {
+    "nom": "Couronné",
+    "description": "Attaque en tranchant, intérieure ou extérieure, portée par un grand mouvement circulaire qui passe au-dessus de la tête.",
+    "categorie": "main",
+    "caracteristiques": ["intérieure", "extérieure"]
+  },
+  {
+    "nom": "Balayage",
+    "description": "Attaque oblique remontante visant le genou adverse, accompagnée d'un changement de garde avant.",
+    "categorie": "main"
+  },
+  {
+    "nom": "Remise",
+    "description": "Seconde action offensive immédiate qui change la trajectoire d'attaque par un retrait de la pointe. Le livret indique qu'elle n'est pas autorisée par la convention sportive.",
+    "categorie": "main"
+  },
+  {
+    "nom": "Coulé",
+    "description": "Faire glisser sa lame le long de la lame adverse en allongeant le bras pour préparer et placer l'attaque.",
+    "categorie": "main"
+  },
+  {
+    "nom": "Dérobement",
+    "description": "Soustraire sa lame à la préparation de lame adverse ; le livret le décrit comme une action offensive ou contre-offensive.",
+    "categorie": "main"
+  },
+  {
+    "nom": "Contre-temps",
+    "description": "Action offensive de seconde intention qui provoque une attaque adverse, généralement par allongement du bras, afin de la parer puis de riposter immédiatement. Le livret précise que cette action ne devrait pas avoir lieu selon la convention sportive du sabre laser.",
+    "categorie": "main"
+  },
+  {
     "nom": "Prise des guerriers",
     "description": "Maintenir les deux lames en pression au contact et avancer jusqu'à la courte distance pour empêcher la riposte.",
     "categorie": "combine"

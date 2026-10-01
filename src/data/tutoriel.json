@@ -1,0 +1,38 @@
+[
+  {
+    "id": "fighters",
+    "title": "Les combattants",
+    "text": "Ajoutez et renommez les combattants de l’équipe. Leurs noms sont proposés dans les rôles Attaquant et Défenseur, et un renommage met à jour leurs occurrences dans le projet."
+  },
+  {
+    "id": "movements",
+    "title": "Les mouvements",
+    "text": "Consultez les mouvements de main, de pieds et combinés. Cliquez sur un nom pour lire sa description. Le lexique aide à la saisie, mais vous pouvez aussi écrire librement."
+  },
+  {
+    "id": "editor",
+    "title": "Le projet chorégraphique",
+    "text": "Composez votre projet dans cette zone. Les lignes d’action sont regroupées en phrases d’armes et décrivent les échanges, intentions et réactions des combattants."
+  },
+  {
+    "id": "phrases",
+    "title": "Les phrases d’armes",
+    "text": "Une phrase regroupe plusieurs lignes d’action. Son timing de fin détermine le début de la suivante. Le bouton sous le projet permet d’ajouter une phrase."
+  },
+  {
+    "id": "lines",
+    "title": "Les lignes d’action",
+    "text": "Saisissez l’attaquant, ses mouvements et ses détails, puis éventuellement un défenseur et sa réaction. Le bouton + ajoute une ligne ; les flèches ou le glisser-déposer permettent de la déplacer.",
+    "textEmpty": "Cette phrase ne contient pas encore de ligne. Cliquez sur « Ajouter la première ligne » pour créer votre première action."
+  },
+  {
+    "id": "autosave",
+    "title": "Le brouillon local",
+    "text": "Votre projet est enregistré dans le stockage de ce navigateur, sur cet appareil. Téléchargez-le pour en conserver une copie sous forme de fichier."
+  },
+  {
+    "id": "download",
+    "title": "Télécharger le projet",
+    "text": "Téléchargez le projet au format texte, avec les phrases, leurs timings et les actions numérotées. Une ligne commencée doit avoir un attaquant et au moins un mouvement."
+  }
+]

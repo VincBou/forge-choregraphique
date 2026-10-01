@@ -4,6 +4,7 @@ Application web à page unique pour écrire un projet chorégraphique de sabre l
 
 ## Utiliser l’éditeur
 
+- Le bouton **Comment ça marche ?** lance une visite guidée des principaux panneaux. Utilisez **Suivant** pour avancer, **Annuler** ou Échap pour quitter. Les textes des étapes se modifient dans `src/data/tutoriel.json`.
 - L’équipe commence avec « Combattant A » et « Combattant B ». Après validation d’un nouveau nom par Entrée ou en quittant le champ, ses occurrences exactes dans les rôles Attaquant et Défenseur sont mises à jour. Un nom existant laissé vide est restauré.
 - Les mouvements `main` sont proposés dans le champ de main, les mouvements `pieds` dans celui de pieds. Les actions `combine` réunissent les deux et se choisissent dans le champ de main ; elles effacent le mouvement de pieds déjà saisi et masquent ce champ.
 - Le défenseur est facultatif. Lorsqu’il est renseigné, les champs de réaction (« qui », mouvement et détail libre) apparaissent. Le bouton `+` ajoute une ligne.
@@ -13,9 +14,9 @@ Application web à page unique pour écrire un projet chorégraphique de sabre l
 
 ## Lexique des mouvements et source FFE
 
-Le lexique est dans [`src/data/mouvements.json`](./src/data/mouvements.json). Chaque entrée contient `nom` (autocomplétion), `description` et `categorie` (`main`, `pieds` ou `combine`). Cliquez sur un mouvement pour lire sa description ; elle disparaît lorsque le pointeur quitte sa ligne. La liste reste unique ; les icônes de main et de chaussure identifient les catégories, et une action combinée affiche les deux. Les SVG sont dans `public/resources/icons/`.
+Le lexique est dans [`src/data/mouvements.json`](./src/data/mouvements.json). Chaque entrée contient `nom` (autocomplétion), `description` et `categorie` (`main`, `pieds` ou `combine`), avec éventuellement `caracteristiques`, une liste de propositions pour le détail libre. Pour une action qui en fournit, les détails de l’attaquant et la réaction du défenseur proposent des caractéristiques limitées au segment entre virgules sous le curseur. Ces propositions restent facultatives. Cliquez sur un mouvement pour lire sa description ; elle disparaît lorsque le pointeur quitte sa ligne. La liste reste unique ; les icônes de main et de chaussure identifient les catégories, et une action combinée affiche les deux. Les SVG sont dans `public/resources/icons/`.
 
-Les mouvements FFE ajoutés proviennent du document de la Fédération française d’escrime, *Sabre Laser — Livret 1, Cahier technique*, version 02.7.2, décembre 2025. Le fichier JSON sert d’aide à l’écriture et ne reprend pas exhaustivement le livret.
+Les mouvements FFE ajoutés proviennent du document de la Fédération française d’escrime, *Sabre Laser — Livret 1, Cahier technique*, version 02.7.2, décembre 2025 : positions et postures de garde, déplacements, techniques combinées et actions offensives (chapitres correspondants). Le fichier JSON sert d’aide à l’écriture et ne reprend pas exhaustivement le livret.
 
 ## Démarrer
 

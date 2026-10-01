@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import movementData from './data/mouvements.json';
 import AutocompleteInput from './components/AutocompleteInput';
+import GuidedTour from './components/GuidedTour';
 import {
   createLineId,
   defaultDraft,
@@ -21,7 +22,7 @@ import {
   type MovementCategory,
 } from './lib/project';
 
-type Movement = { nom: string; description: string; categorie: MovementCategory };
+type Movement = { nom: string; description: string; categorie: MovementCategory; caracteristiques?: string[] };
 function isMovementList(value: unknown): value is Movement[] {
   return Array.isArray(value) && value.length <= 1000 && value.every((item) =>
     !!item && typeof item === 'object'
@@ -30,12 +31,17 @@ function isMovementList(value: unknown): value is Movement[] {
     && (item as Movement).nom.length <= 100
     && typeof (item as Movement).description === 'string'
     && (item as Movement).description.length <= 1000
+    && ((item as Movement).caracteristiques === undefined || (Array.isArray((item as Movement).caracteristiques)
+      && (item as Movement).caracteristiques!.length <= 100
+      && (item as Movement).caracteristiques!.every((value) => typeof value === 'string' && value.trim().length > 0 && value.length <= 100 && !/[\r\n\u0000-\u001f\u007f]/.test(value))))
     && ['main', 'pieds', 'combine'].includes((item as Movement).categorie));
 }
 
 const movementList = isMovementList(movementData) ? movementData : [];
 const combinedMovementNames = new Set(movementList.filter((movement) => movement.categorie === 'combine').map((movement) => normalizeSearch(movement.nom)));
 const isCombinedMovement = (value: string) => combinedMovementNames.has(normalizeSearch(value.trim()));
+const characteristicsByMovement = new Map(movementList.filter((movement) => movement.caracteristiques?.length).map((movement) => [normalizeSearch(movement.nom), movement.caracteristiques ?? []]));
+const getCharacteristics = (...names: string[]) => [...new Set(names.flatMap((name) => characteristicsByMovement.get(normalizeSearch(name.trim())) ?? []))];
 const movementCategories = new Map(movementList.map((movement) => [normalizeSearch(movement.nom), movement.categorie]));
 const initialState = loadDraft(undefined, movementCategories);
 const createEmptyLine = (): ChoreographyLine => ({ id: createLineId(), attacker: '', handMovement: '', footMovement: '', details: '', defender: '', defenderMovement: '', defenderDetails: '' });
@@ -50,6 +56,7 @@ export default function App() {
   const [fighterEdits, setFighterEdits] = useState<Record<number, string>>({});
   const [timingEdits, setTimingEdits] = useState<Record<string, string>>({});
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [tourOpen, setTourOpen] = useState(false);
   const hasEdited = useRef(false);
   const fighterSuggestions = useMemo(() => draft.fighters.filter(Boolean), [draft.fighters]);
   const movementSuggestions = useMemo(() => movementList.map((movement) => movement.nom), []);
@@ -268,8 +275,9 @@ export default function App() {
           <h1>Forge Chorégraphique</h1>
         </div>
         <div className="topbar-actions">
+          <button className="button button-muted" type="button" onClick={() => setTourOpen(true)}>Comment ça marche ?</button>
           <button className="button button-muted" type="button" onClick={clearLocalProject}>Effacer le brouillon local</button>
-          <button className="button button-primary" type="button" onClick={exportProject}><span aria-hidden="true">↓</span> Télécharger le projet</button>
+          <button className="button button-primary" type="button" data-tour="download" onClick={exportProject}><span aria-hidden="true">↓</span> Télécharger le projet</button>
         </div>
       </header>
 
@@ -277,7 +285,7 @@ export default function App() {
 
       <div className="workspace">
         <aside className="sidebar" aria-label="Ressources du projet">
-          <section className="panel fighters-panel">
+          <section className="panel fighters-panel" data-tour="fighters">
             <div className="section-heading">
               <div><p className="eyebrow">ÉQUIPE</p><h2>Combattants</h2></div>
               <span className="count-badge">{draft.fighters.length}</span>
@@ -310,7 +318,7 @@ export default function App() {
             <p className="hint">Les noms restent modifiables directement dans la liste.</p>
           </section>
 
-          <section className="panel movements-panel">
+          <section className="panel movements-panel" data-tour="movements">
             <div className="section-heading">
               <div><p className="eyebrow">LEXIQUE SL</p><h2>Mouvements</h2></div>
               <span className="count-badge">{movementList.length}</span>
@@ -344,13 +352,13 @@ export default function App() {
         </aside>
 
         <section className="editor" aria-labelledby="project-title">
-          <div className="editor-heading">
+          <div className="editor-heading" data-tour="editor">
             <div>
               <p className="eyebrow">VOTRE SÉQUENCE</p>
               <h2 id="project-title">Projet chorégraphique</h2>
               <p className="subtitle">Composez le rythme, les intentions et les échanges de votre duel.</p>
             </div>
-            <div className="autosave"><span className="save-dot" aria-hidden="true" /> Brouillon local</div>
+            <div className="autosave" data-tour="autosave"><span className="save-dot" aria-hidden="true" /> Brouillon local</div>
           </div>
 
           <div className="notation-guide" aria-hidden="true">
@@ -361,7 +369,7 @@ export default function App() {
               const start = phraseStart(draft.phrases, phraseIndex);
               const phraseName = `Phrase d’armes ${phraseIndex + 1}`;
               return (
-                <section className="phrase-group" key={phrase.id} aria-labelledby={`phrase-title-${phrase.id}`}>
+                <section className="phrase-group" key={phrase.id} aria-labelledby={`phrase-title-${phrase.id}`} data-tour={phraseIndex === 0 ? 'phrases' : undefined}>
                   <div className="phrase-rail">
                     <h3 id={`phrase-title-${phrase.id}`}>{phraseName}</h3>
                     <div className="phrase-timing"><span>Début</span><span>{formatTiming(start)}</span></div>
@@ -399,6 +407,7 @@ export default function App() {
                         <div
                           className={`choreo-line${beforeTarget ? ' drop-before' : ''}${afterTarget ? ' drop-after' : ''}`}
                           key={line.id}
+                          data-tour={phraseIndex === 0 && lineIndex === 0 ? 'lines' : undefined}
                           onDragOver={(event) => {
                             event.preventDefault();
                             const rect = event.currentTarget.getBoundingClientRect();
@@ -412,7 +421,7 @@ export default function App() {
                           <AutocompleteInput id={`attacker-${line.id}`} label={`Attaquant, ligne ${lineNumber}`} value={line.attacker} suggestions={fighterSuggestions} placeholder="Choisir ou saisir" required maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'attacker', value)} />
                           <AutocompleteInput id={`hand-movement-${line.id}`} label={`Mouvement de main, ligne ${lineNumber}`} value={line.handMovement} suggestions={handSuggestions} placeholder="Mouvement de main" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'handMovement', value)} />
                           {!(isCombinedMovement(line.handMovement) && !line.footMovement.trim()) && <AutocompleteInput id={`foot-movement-${line.id}`} label={`Mouvement de pieds, ligne ${lineNumber}`} value={line.footMovement} suggestions={footSuggestions} placeholder="Mouvement de pieds" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'footMovement', value)} />}
-                          <input className="details-input" aria-label={`Détail libre, ligne ${lineNumber}`} value={line.details} maxLength={MAX_DETAILS_LENGTH} autoComplete="off" placeholder="Ajouter un détail…" onChange={(event) => updateLine(line.id, 'details', event.target.value)} />
+                          <AutocompleteInput id={`details-${line.id}`} className="details-autocomplete" label={`Détail libre, ligne ${lineNumber}`} value={line.details} suggestions={getCharacteristics(line.handMovement, line.footMovement)} placeholder="Ajouter un détail…" maxLength={MAX_DETAILS_LENGTH} commaDelimited onChange={(value) => updateLine(line.id, 'details', value)} />
                           <div className="defender-group">
                             {line.defender.trim() && <span className="against-label">contre</span>}
                             <AutocompleteInput id={`defender-${line.id}`} label={`Défenseur facultatif, ligne ${lineNumber}`} value={line.defender} suggestions={fighterSuggestions} placeholder="Défenseur" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'defender', value)} onBlur={(value) => handleDefenderBlur(line.id, value)} />
@@ -421,7 +430,7 @@ export default function App() {
                             <div className="defender-reaction">
                               <span className="reaction-intro">qui</span>
                               <AutocompleteInput id={`defender-movement-${line.id}`} label={`Mouvement de réaction du défenseur, ligne ${lineNumber}`} value={line.defenderMovement} suggestions={movementSuggestions} placeholder="Mouvement de réaction" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'defenderMovement', value)} />
-                              <input className="details-input" aria-label={`Détail de réaction du défenseur, ligne ${lineNumber}`} value={line.defenderDetails} maxLength={MAX_DETAILS_LENGTH} autoComplete="off" placeholder="Détail / intention" onChange={(event) => updateLine(line.id, 'defenderDetails', event.target.value)} />
+                              <AutocompleteInput id={`defender-details-${line.id}`} className="details-autocomplete" label={`Détail de réaction du défenseur, ligne ${lineNumber}`} value={line.defenderDetails} suggestions={getCharacteristics(line.defenderMovement)} placeholder="Détail / intention" maxLength={MAX_DETAILS_LENGTH} commaDelimited onChange={(value) => updateLine(line.id, 'defenderDetails', value)} />
                             </div>
                           )}
                           <div className="line-actions">
@@ -433,7 +442,7 @@ export default function App() {
                         </div>
                       );
                     })}
-                    {phrase.lines.length === 0 && <div className="empty-phrase"><p>Déposez une ligne ici ou ajoutez-en une.</p><button className="button button-muted" type="button" disabled={lineCount >= MAX_LINES} onClick={() => addLine(phrase.id)}>Ajouter la première ligne</button></div>}
+                    {phrase.lines.length === 0 && <div className="empty-phrase" data-tour={phraseIndex === 0 ? 'lines' : undefined}><p>Déposez une ligne ici ou ajoutez-en une.</p><button className="button button-muted" type="button" disabled={lineCount >= MAX_LINES} onClick={() => addLine(phrase.id)}>Ajouter la première ligne</button></div>}
                   </div>
                 </section>
               );
@@ -449,6 +458,7 @@ export default function App() {
       </div>
 
       <footer className="page-footer"><span>FORGE CHORÉGRAPHIQUE <span aria-hidden="true">·</span> V0</span><span>Votre projet est conservé uniquement dans ce navigateur.</span></footer>
+      {tourOpen && <GuidedTour onClose={() => setTourOpen(false)} />}
     </main>
   );
 }

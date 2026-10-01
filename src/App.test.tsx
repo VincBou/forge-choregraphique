@@ -41,12 +41,67 @@ describe('App security and editor basics', () => {
     expect(screen.getByRole('listbox', { name: /Mouvement de main/ })).toHaveTextContent(/Quarte/);
     expect(within(screen.getByRole('listbox', { name: /Mouvement de main/ })).queryByRole('option', { name: 'Marche' })).not.toBeInTheDocument();
     fireEvent.change(hand, { target: { value: '' } });
+    fireEvent.change(hand, { target: { value: 'attaq' } });
+    expect(within(screen.getByRole('listbox', { name: /Mouvement de main/ })).getByRole('option', { name: 'Attaque' })).toBeInTheDocument();
+    fireEvent.change(hand, { target: { value: '' } });
 
     const feet = screen.getByRole('combobox', { name: 'Mouvement de pieds, ligne 1.1' });
     fireEvent.change(feet, { target: { value: 'm' } });
     expect(screen.getByRole('listbox', { name: /Mouvement de pieds/ })).toHaveTextContent(/Marche/);
     expect(within(screen.getByRole('listbox', { name: /Mouvement de pieds/ })).queryByRole('option', { name: 'Quarte' })).not.toBeInTheDocument();
     expect(within(screen.getByRole('listbox', { name: /Mouvement de pieds/ })).queryByRole('option', { name: 'Supernova' })).not.toBeInTheDocument();
+  });
+
+  it('guides through all seven editor zones and finishes the tour', () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Comment ça marche ?' }));
+    const steps = ['fighters', 'movements', 'editor', 'phrases', 'lines', 'autosave', 'download'];
+
+    steps.forEach((target, index) => {
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toHaveTextContent(new RegExp(`Étape ${index + 1} sur 7`, 'i'));
+      expect(document.querySelector(`[data-tour="${target}"]`)).toBeInTheDocument();
+      fireEvent.click(within(dialog).getByRole('button', { name: index === steps.length - 1 ? 'Terminer' : 'Suivant' }));
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('can cancel the tour and highlights the first-line drop zone when the project has no lines', () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Comment ça marche ?' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Annuler' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer la ligne 1.1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Comment ça marche ?' }));
+    const dialog = screen.getByRole('dialog');
+    for (let step = 0; step < 4; step += 1) fireEvent.click(within(dialog).getByRole('button', { name: 'Suivant' }));
+    expect(document.querySelector('.empty-phrase[data-tour="lines"]')).toBeInTheDocument();
+    expect(dialog).toHaveTextContent(/ajouter la première ligne/i);
+  });
+
+  it('completes characteristics in only the comma-delimited segment for both free-detail fields', () => {
+    render(<App />);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Mouvement de main, ligne 1.1' }), { target: { value: 'Attaque' } });
+    const details = screen.getByRole('combobox', { name: 'Détail libre, ligne 1.1' });
+    fireEvent.change(details, { target: { value: 'dir, ob, après', selectionStart: 3, selectionEnd: 3 } });
+    fireEvent.click(screen.getByRole('option', { name: 'directe' }));
+    expect(details).toHaveValue('directe, ob, après');
+
+    fireEvent.change(details, { target: { value: 'directe, vert, après', selectionStart: 13, selectionEnd: 13 } });
+    fireEvent.click(screen.getByRole('option', { name: 'verticale descendante' }));
+    expect(details).toHaveValue('directe, verticale descendante, après');
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Mouvement de main, ligne 1.1' }), { target: { value: 'Parade' } });
+    fireEvent.focus(details);
+    expect(screen.queryByRole('listbox', { name: /Détail libre/ })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Défenseur facultatif, ligne 1.1' }), { target: { value: 'Combattant B' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Mouvement de réaction du défenseur, ligne 1.1' }), { target: { value: 'Estoc' } });
+    const reactionDetails = screen.getByRole('combobox', { name: 'Détail de réaction du défenseur, ligne 1.1' });
+    fireEvent.change(reactionDetails, { target: { value: 'ligne, des', selectionStart: 10, selectionEnd: 10 } });
+    fireEvent.click(screen.getByRole('option', { name: 'dessus' }));
+    expect(reactionDetails).toHaveValue('ligne, dessus');
   });
 
   it('keeps each phrase as one parent group and starts the next at the previous end', () => {
