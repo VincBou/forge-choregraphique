@@ -116,6 +116,11 @@ h1 { margin-bottom: 0; font: 600 19px Arial, sans-serif; letter-spacing: -.03em;
 .phrase-group { display: grid; grid-template-columns: 148px minmax(0, 1fr); align-items: stretch; gap: 10px; }
 .phrase-rail { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 13px 11px; border: 1px solid #e9ad5630; border-radius: 9px; background: linear-gradient(160deg, #e9ad560d, #ffffff03); }
 .phrase-rail h3 { margin: 0; color: var(--accent-bright); font: 600 12px Arial, sans-serif; line-height: 1.4; }
+.phrase-rail h3:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 3px; }
+.delete-phrase { margin-top: auto; color: var(--danger); }
+.delete-phrase:hover { color: #ffabb3; }
+.delete-phrase:disabled { opacity: .4; cursor: not-allowed; }
+.delete-phrase span { font-size: 18px; }
 .phrase-timing { display: flex; align-items: center; justify-content: space-between; gap: 7px; color: #8d97a8; font: 9px Consolas, monospace; }
 .phrase-timing output { color: #d7dce5; }
 .phrase-timing input { width: 75px; min-width: 0; height: 29px; padding: 0 6px; border: 1px solid #ffffff18; border-radius: 5px; color: #e4e8f0; background: #10131a99; font: 10px Consolas, monospace; }

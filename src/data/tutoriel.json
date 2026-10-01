@@ -27,7 +27,7 @@
   {
     "id": "phrases",
     "title": "Les phrases d’armes",
-    "text": "Une phrase regroupe plusieurs lignes d’action. Son timing de fin détermine le début de la suivante. Le bouton sous le projet permet d’ajouter une phrase."
+    "text": "Une phrase regroupe plusieurs lignes d’action. Son timing de fin détermine le début de la suivante. Le bouton sous le projet permet d’ajouter une phrase. Le bouton Supprimer dans son encart efface la phrase et ses lignes, après confirmation si elle contient des actions ; les phrases suivantes avancent pour préserver leur durée."
   },
   {
     "id": "lines",

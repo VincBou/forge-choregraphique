@@ -8,6 +8,7 @@ import {
   defaultDraft,
   formatProject,
   getExportError,
+  hasStartedLine,
   loadDraft,
   LEGACY_STORAGE_KEY,
   OLDER_STORAGE_KEY,
@@ -68,6 +69,7 @@ export default function App() {
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [tourOpen, setTourOpen] = useState(false);
   const hasEdited = useRef(false);
+  const pendingPhraseFocus = useRef<string | null>(null);
   const fighterSuggestions = useMemo(() => draft.fighters.map((fighter) => fighter.name).filter(Boolean), [draft.fighters]);
   const movementSuggestions = useMemo(() => movementList.map((movement) => movement.nom), []);
   const handSuggestions = useMemo(() => movementList.filter((movement) => movement.categorie === 'main' || movement.categorie === 'combine').map((movement) => movement.nom), []);
@@ -86,6 +88,12 @@ export default function App() {
       setNotice('Impossible d’enregistrer le brouillon dans ce navigateur. Copiez les informations du projet avant de fermer cette page.');
     }
   }, [draft]);
+
+  useEffect(() => {
+    if (!pendingPhraseFocus.current) return;
+    document.querySelector<HTMLElement>(`[data-phrase-focus="${pendingPhraseFocus.current}"]`)?.focus();
+    pendingPhraseFocus.current = null;
+  }, [draft.phrases]);
 
   function changeDraft(nextDraft: typeof draft) {
     hasEdited.current = true;
@@ -181,6 +189,27 @@ export default function App() {
     setExportError(null);
   }
 
+  function removePhrase(id: string) {
+    if (draft.phrases.length <= 1) return;
+    const index = draft.phrases.findIndex((phrase) => phrase.id === id);
+    if (index < 0) return;
+    const phrase = draft.phrases[index];
+    if (phrase.lines.some(hasStartedLine) && !window.confirm(`Supprimer Phrase d’armes ${index + 1} et ses lignes d’action ? Cette action ne peut pas être annulée.`)) return;
+
+    const duration = phrase.end - phraseStart(draft.phrases, index);
+    const phrases = draft.phrases.filter((candidate) => candidate.id !== id);
+    for (let next = index; next < phrases.length; next += 1) {
+      const previousEnd = next === 0 ? 0 : phrases[next - 1].end;
+      phrases[next] = { ...phrases[next], end: Math.max(previousEnd, phrases[next].end - duration) };
+    }
+    pendingPhraseFocus.current = (phrases[index] ?? phrases[index - 1]).id;
+    const shiftedPhraseIds = new Set(draft.phrases.slice(index).map((candidate) => candidate.id));
+    setTimingEdits((edits) => Object.fromEntries(Object.entries(edits).filter(([phraseId]) => !shiftedPhraseIds.has(phraseId))));
+    setDropTarget(null);
+    changeDraft({ ...draft, phrases });
+    setExportError(null);
+  }
+
   function removeLine(id: string) {
     changeDraft({ ...draft, phrases: draft.phrases.map((phrase) => ({
       ...phrase,
@@ -237,11 +266,10 @@ export default function App() {
     moveLineTo(event.dataTransfer.getData('text/plain'), phraseIndex);
   }
 
-  function commitPhraseEnd(index: number) {
+  function commitPhraseEnd(index: number, edited = timingEdits[draft.phrases[index].id], clearEdit = true) {
     const phrase = draft.phrases[index];
-    const edited = timingEdits[phrase.id];
     if (edited === undefined) return;
-    setTimingEdits(({ [phrase.id]: _discarded, ...edits }) => edits);
+    if (clearEdit) setTimingEdits(({ [phrase.id]: _discarded, ...edits }) => edits);
     if (!edited.trim()) return;
     const value = Number(edited);
     if (!Number.isFinite(value) || value < 0) return;
@@ -465,7 +493,7 @@ export default function App() {
               return (
                 <section className="phrase-group" key={phrase.id} aria-labelledby={`phrase-title-${phrase.id}`} data-tour={phraseIndex === 0 ? 'phrases' : undefined}>
                   <div className="phrase-rail">
-                    <h3 id={`phrase-title-${phrase.id}`}>{phraseName}</h3>
+                    <h3 id={`phrase-title-${phrase.id}`} tabIndex={-1} data-phrase-focus={phrase.id}>{phraseName}</h3>
                     <div className="phrase-timing"><span>Début</span><span>{formatTiming(start)}</span></div>
                     <label className="phrase-timing" htmlFor={`phrase-end-${phrase.id}`}><span>Fin</span>
                       <input
@@ -473,10 +501,14 @@ export default function App() {
                         aria-label={`Fin de ${phraseName}`}
                         type="number"
                         min={start}
-                        step="any"
+                        step="0.1"
                         value={timingEdits[phrase.id] ?? formatTiming(phrase.end)}
                         onFocus={() => setTimingEdits((edits) => ({ ...edits, [phrase.id]: formatTiming(phrase.end) }))}
-                        onChange={(event) => setTimingEdits((edits) => ({ ...edits, [phrase.id]: event.target.value }))}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setTimingEdits((edits) => ({ ...edits, [phrase.id]: value }));
+                          commitPhraseEnd(phraseIndex, value, false);
+                        }}
                         onBlur={() => commitPhraseEnd(phraseIndex)}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter') { event.preventDefault(); commitPhraseEnd(phraseIndex); }
@@ -484,6 +516,16 @@ export default function App() {
                         }}
                       />
                     </label>
+                    <button
+                      className="text-button delete-phrase"
+                      type="button"
+                      aria-label={`Supprimer ${phraseName}`}
+                      title={draft.phrases.length === 1 ? 'Le projet doit conserver au moins une phrase d’armes.' : undefined}
+                      disabled={draft.phrases.length === 1}
+                      onClick={() => removePhrase(phrase.id)}
+                    >
+                      <span aria-hidden="true">×</span> Supprimer
+                    </button>
                   </div>
                   <div
                     className={`phrase-lines${phrase.lines.length === 0 && dropTarget === `${phrase.id}:empty` ? ' is-drop-target' : ''}`}

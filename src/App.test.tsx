@@ -1,9 +1,10 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 
 describe('App security and editor basics', () => {
   beforeEach(() => window.localStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
 
   it('keeps entered HTML as inert input text', () => {
     const { container } = render(<App />);
@@ -118,6 +119,65 @@ describe('App security and editor basics', () => {
     expect(screen.getByRole('heading', { name: 'Phrase d’armes 2' })).toBeInTheDocument();
     expect(screen.getByRole('spinbutton', { name: 'Fin de Phrase d’armes 2' })).toHaveValue(2.5);
     expect(container.querySelectorAll('.phrase-rail')).toHaveLength(2);
+  });
+
+  it('deletes a confirmed phrase, shifts later timings, renumbers lines and focuses the next phrase', () => {
+    const { container } = render(<App />);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Détail libre, ligne 1.1' }), { target: { value: 'Première' } });
+    const firstEnd = screen.getByRole('spinbutton', { name: 'Fin de Phrase d’armes 1' });
+    fireEvent.change(firstEnd, { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: /Ajouter une Phrase d’armes/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter la première ligne' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Détail libre, ligne 2.1' }), { target: { value: 'À retirer' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Fin de Phrase d’armes 2' }), { target: { value: '15' } });
+    fireEvent.click(screen.getByRole('button', { name: /Ajouter une Phrase d’armes/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter la première ligne' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Détail libre, ligne 3.1' }), { target: { value: 'Dernière' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Fin de Phrase d’armes 3' }), { target: { value: '20' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer Phrase d’armes 2' }));
+
+    expect(screen.getByRole('heading', { name: 'Phrase d’armes 1' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Phrase d’armes 2' })).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('À retirer')).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Détail libre, ligne 2.1' })).toHaveValue('Dernière');
+    expect(screen.getByRole('spinbutton', { name: 'Fin de Phrase d’armes 2' })).toHaveValue(15);
+    expect(within(screen.getByRole('region', { name: 'Phrase d’armes 2' })).getByText('10.0')).toBeInTheDocument();
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Phrase d’armes 2' }));
+    expect(JSON.parse(window.localStorage.getItem('forgechoree.project.v5') ?? '{}').phrases.map((phrase: { end: number }) => phrase.end)).toEqual([10, 15]);
+    expect(container.querySelectorAll('.phrase-group')).toHaveLength(2);
+  });
+
+  it('cancels deletion of a phrase with actions and keeps the last phrase undeletable', () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<App />);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Détail libre, ligne 1.1' }), { target: { value: 'Action' } });
+    const deletePhrase = screen.getByRole('button', { name: 'Supprimer Phrase d’armes 1' });
+    expect(deletePhrase).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: /Ajouter une Phrase d’armes/ }));
+    expect(screen.getByRole('button', { name: 'Supprimer Phrase d’armes 1' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer Phrase d’armes 1' }));
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(screen.getByRole('heading', { name: 'Phrase d’armes 1' })).toBeInTheDocument();
+  });
+
+  it('applies phrase end changes without blur to following timings, storage and duration calculation', () => {
+    render(<App />);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Détail libre, ligne 1.1' }), { target: { value: 'Action' } });
+    fireEvent.click(screen.getByRole('button', { name: /Ajouter une Phrase d’armes/ }));
+    const firstEnd = screen.getByRole('spinbutton', { name: 'Fin de Phrase d’armes 1' });
+    fireEvent.focus(firstEnd);
+    fireEvent.change(firstEnd, { target: { value: '5.5' } });
+
+    expect(screen.getByRole('spinbutton', { name: 'Fin de Phrase d’armes 2' })).toHaveValue(5.5);
+    const secondPhrase = screen.getByRole('region', { name: 'Phrase d’armes 2' });
+    expect(within(secondPhrase).getByText('5.5')).toBeInTheDocument();
+    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v5') ?? '{}');
+    expect(savedDraft.phrases[0].end).toBe(5.5);
+    expect(savedDraft.phrases[1].end).toBe(5.5);
+    fireEvent.click(screen.getByRole('button', { name: 'Calculer la durée d’opposition' }));
+    expect(screen.getByRole('textbox', { name: 'Durée d’opposition' })).toHaveValue('00m:05.5s');
   });
 
   it('renames all exact attacker and defender references when a fighter name is committed', () => {

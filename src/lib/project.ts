@@ -340,7 +340,7 @@ export function calculateOppositionDuration(draft: ProjectDraft): string {
   }
   const totalMilliseconds = Math.round((totalSeconds + 1e-9) * 1000);
   const minutes = Math.floor(totalMilliseconds / 60000);
-  const secondsAndFraction = ((totalMilliseconds % 60000) / 1000).toFixed(3).replace(/\.?0+$/, '').padStart(2, '0');
+  const secondsAndFraction = ((totalMilliseconds % 60000) / 1000).toFixed(3).padStart(6, '0').replace(/\.?0+$/, '');
   return `${String(minutes).padStart(2, '0')}m:${secondsAndFraction}s`;
 }
 

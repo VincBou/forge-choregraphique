@@ -19,7 +19,7 @@ Use two-space indentation, React function components, descriptive camelCase name
 
 ## Testing Guidelines
 
-Place focused `.test.ts` or `.test.tsx` files beside the code they cover. Exercise editor behavior, guided-tour order and cancellation, its empty-line target, project metadata and participant details, opposition-duration calculation, phrase grouping and timing, line ordering/movement between phrases, lexicon categories and characteristic suggestions, comma-segment completion in both detail fields, defender reactions, exact fighter-name replacement, draft persistence/migration, and text export where affected. Empty phrases stay editable but are omitted from export; movement lines must belong to a phrase. Run `npm test` and `npm run build` for application changes.
+Place focused `.test.ts` or `.test.tsx` files beside the code they cover. Exercise editor behavior, guided-tour order and cancellation, its empty-line target, project metadata and participant details, opposition-duration calculation, phrase grouping, deletion confirmation and timing rebasing, line ordering/movement between phrases, lexicon categories and characteristic suggestions, comma-segment completion in both detail fields, defender reactions, exact fighter-name replacement, draft persistence/migration, and text export where affected. Empty phrases stay editable but are omitted from export; movement lines must belong to a phrase. Run `npm test` and `npm run build` for application changes.
 
 ## Commits, Pull Requests & Security
 
