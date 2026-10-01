@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import movementData from './data/mouvements.json';
 import AutocompleteInput from './components/AutocompleteInput';
 import GuidedTour from './components/GuidedTour';
@@ -25,6 +25,9 @@ import {
   normalizeSingleLine,
   STORAGE_KEY,
   V4_STORAGE_KEY,
+  createProjectFile,
+  parseProjectFile,
+  MAX_PROJECT_FILE_BYTES,
   type ChoreographyLine,
   type Fighter,
   type Assistant,
@@ -68,8 +71,14 @@ export default function App() {
   const [timingEdits, setTimingEdits] = useState<Record<string, string>>({});
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [tourOpen, setTourOpen] = useState(false);
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+  const [pdfFormat, setPdfFormat] = useState('A4-landscape');
   const hasEdited = useRef(false);
   const pendingPhraseFocus = useRef<string | null>(null);
+  const downloadMenuRef = useRef<HTMLDivElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const pdfDialogRef = useRef<HTMLDialogElement>(null);
   const fighterSuggestions = useMemo(() => draft.fighters.map((fighter) => fighter.name).filter(Boolean), [draft.fighters]);
   const movementSuggestions = useMemo(() => movementList.map((movement) => movement.nom), []);
   const handSuggestions = useMemo(() => movementList.filter((movement) => movement.categorie === 'main' || movement.categorie === 'combine').map((movement) => movement.nom), []);
@@ -85,9 +94,38 @@ export default function App() {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
     } catch {
-      setNotice('Impossible d’enregistrer le brouillon dans ce navigateur. Copiez les informations du projet avant de fermer cette page.');
+      setNotice('Le brouillon reste ouvert mais ne peut pas être enregistré localement. Téléchargez une copie JSON avant de fermer cette page.');
     }
   }, [draft]);
+
+  useEffect(() => {
+    if (!downloadMenuOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!downloadMenuRef.current?.contains(event.target as Node)) setDownloadMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setDownloadMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [downloadMenuOpen]);
+
+  useEffect(() => {
+    const dialog = pdfDialogRef.current;
+    if (!dialog) return;
+    if (pdfDialogOpen && !dialog.open) {
+      if (typeof dialog.showModal === 'function') dialog.showModal();
+      else dialog.setAttribute('open', '');
+    }
+    if (!pdfDialogOpen && dialog.open) {
+      if (typeof dialog.close === 'function') dialog.close();
+      else dialog.removeAttribute('open');
+    }
+  }, [pdfDialogOpen]);
 
   useEffect(() => {
     if (!pendingPhraseFocus.current) return;
@@ -302,13 +340,7 @@ export default function App() {
   function exportProject() {
     const error = getExportError(draft);
     if (error) { setExportError(error); return; }
-    const file = new Blob([`\uFEFF${formatProject(draft)}`], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(file);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'projet-choregraphique.txt';
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    downloadFile(`\uFEFF${formatProject(draft)}`, 'text/plain;charset=utf-8', 'txt');
     setExportError(null);
   }
 
@@ -329,6 +361,71 @@ export default function App() {
     setExportError(null);
   }
 
+  function downloadFile(contents: BlobPart, type: string, extension: string) {
+    const url = URL.createObjectURL(new Blob([contents], { type }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `projet-choregraphique.${extension}`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  function exportJson() {
+    const json = JSON.stringify(createProjectFile(draft), null, 2);
+    if (new TextEncoder().encode(json).byteLength > MAX_PROJECT_FILE_BYTES) {
+      setExportError('Le projet dépasse la taille maximale de 10 Mo pour un fichier JSON.');
+      return;
+    }
+    downloadFile(json, 'application/json;charset=utf-8', 'json');
+    setDownloadMenuOpen(false);
+    setExportError(null);
+  }
+
+  async function importJson(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      if (file.size > MAX_PROJECT_FILE_BYTES) {
+        setNotice('Le fichier dépasse la taille maximale de 10 Mo.');
+        return;
+      }
+      const importedDraft = parseProjectFile(await file.text());
+      if (!importedDraft) {
+        setNotice('Ce fichier JSON est invalide ou utilise une version non prise en charge. Le projet actuel est conservé.');
+        return;
+      }
+      if (!window.confirm('Remplacer le projet actuel par celui du fichier JSON ? Cette action ne peut pas être annulée.')) return;
+      hasEdited.current = true;
+      setDraft(importedDraft);
+      setNotice('Le projet JSON a été importé.');
+      setExportError(null);
+      setOpenDescription(null);
+      setFighterEdits({});
+      setTimingEdits({});
+      setDropTarget(null);
+      setDownloadMenuOpen(false);
+      setPdfDialogOpen(false);
+      setTourOpen(false);
+    } catch {
+      setNotice('Le fichier JSON n’a pas pu être lu. Le projet actuel est conservé.');
+    } finally {
+      input.value = '';
+    }
+  }
+
+  async function exportPdf() {
+    setPdfDialogOpen(false);
+    setDownloadMenuOpen(false);
+    try {
+      const { downloadProjectPdf } = await import('./lib/pdf');
+      await downloadProjectPdf(draft, pdfFormat);
+      setExportError(null);
+    } catch {
+      setNotice('Le PDF n’a pas pu être généré. Vous pouvez toujours télécharger le projet en texte ou JSON.');
+    }
+  }
+
   const lineCount = draft.phrases.reduce((count, phrase) => count + phrase.lines.length, 0);
 
   return (
@@ -342,7 +439,16 @@ export default function App() {
         <div className="topbar-actions">
           <button className="button button-muted" type="button" onClick={() => setTourOpen(true)}>Comment ça marche ?</button>
           <button className="button button-muted" type="button" onClick={clearLocalProject}>Effacer le brouillon local</button>
-          <button className="button button-primary" type="button" data-tour="download" onClick={exportProject}><span aria-hidden="true">↓</span> Télécharger le projet</button>
+          <button className="button button-muted" type="button" data-tour="import" onClick={() => importInputRef.current?.click()}>Importer JSON</button>
+          <input ref={importInputRef} type="file" hidden accept=".json,application/json" aria-label="Importer un projet JSON" onChange={importJson} />
+          <div className="download-menu" ref={downloadMenuRef}>
+            <button className="button button-primary" type="button" data-tour="download" aria-expanded={downloadMenuOpen} aria-controls="download-options" onClick={() => setDownloadMenuOpen((open) => !open)}><span aria-hidden="true">↓</span> Télécharger le projet</button>
+            {downloadMenuOpen && <div className="download-options" id="download-options" aria-label="Formats de téléchargement">
+              <button type="button" onClick={() => { exportProject(); setDownloadMenuOpen(false); }}>Texte (.txt)</button>
+              <button type="button" onClick={() => { setDownloadMenuOpen(false); setPdfDialogOpen(true); }}>PDF ASL-FFE (.pdf)</button>
+              <button type="button" onClick={exportJson}>Projet Forge Chorégraphique (.json)</button>
+            </div>}
+          </div>
         </div>
       </header>
 
@@ -480,7 +586,7 @@ export default function App() {
               <label className="ensemble-toggle"><input type="checkbox" checked={draft.info.ensemble} onChange={(event) => updateProjectInfo('ensemble', event.target.checked)} /> Mouvement d’ensemble</label>
             </div>
             <label className="project-notes">Informations : intrigue, musiques…<textarea aria-label="Informations : intrigue, musiques" maxLength={MAX_PROJECT_INFO_LENGTH} rows={3} value={draft.info.notes} onChange={(event) => updateProjectInfo('notes', normalizeMultiLine(event.target.value, MAX_PROJECT_INFO_LENGTH))} /></label>
-            <p className="hint">Ces informations restent dans le brouillon de ce navigateur et ne sont pas incluses dans le téléchargement actuel.</p>
+            <p className="hint">Ces informations restent dans le brouillon local et figurent dans les exports PDF et JSON.</p>
           </section>
 
           <div className="notation-guide" aria-hidden="true">
@@ -595,6 +701,18 @@ export default function App() {
 
       <footer className="page-footer"><span>FORGE CHORÉGRAPHIQUE <span aria-hidden="true">·</span> V0</span><span>Votre projet est conservé uniquement dans ce navigateur.</span></footer>
       {tourOpen && <GuidedTour onClose={() => setTourOpen(false)} />}
+      <dialog ref={pdfDialogRef} className="pdf-dialog" aria-labelledby="pdf-dialog-title" onClose={() => setPdfDialogOpen(false)} onCancel={() => setPdfDialogOpen(false)}>
+        <form onSubmit={(event) => { event.preventDefault(); void exportPdf(); }}>
+          <p className="eyebrow">EXPORT PDF</p>
+          <h2 id="pdf-dialog-title">Format ASL-FFE</h2>
+          <label htmlFor="pdf-format">Format de page</label>
+          <select id="pdf-format" value={pdfFormat} onChange={(event) => setPdfFormat(event.target.value)}>
+            <option value="A4-landscape">A4 paysage</option><option value="A4-portrait">A4 portrait</option>
+            <option value="A3-landscape">A3 paysage</option><option value="A3-portrait">A3 portrait</option>
+          </select>
+          <div className="pdf-dialog-actions"><button className="button button-muted" type="button" onClick={() => setPdfDialogOpen(false)}>Annuler</button><button className="button button-primary" type="submit">Télécharger le PDF</button></div>
+        </form>
+      </dialog>
     </main>
   );
 }

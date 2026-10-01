@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   calculateOppositionDuration,
+  createProjectFile,
   defaultDraft,
   formatProject,
   getExportError,
@@ -11,6 +12,7 @@ import {
   normalizeSearch,
   normalizeMultiLine,
   normalizeSingleLine,
+  parseProjectFile,
   OLDER_STORAGE_KEY,
   PREVIOUS_STORAGE_KEY,
   STORAGE_KEY,
@@ -34,6 +36,22 @@ describe('project formatting and validation', () => {
     expect(draft.phrases).toHaveLength(1);
     expect(draft.phrases[0].lines).toHaveLength(1);
     expect(getExportError(draft)).toMatch(/au moins une action/i);
+  });
+
+  it('round trips incomplete JSON projects as data while rejecting unknown structure and versions', () => {
+    const draft = defaultDraft();
+    draft.fighters[0].name = '<img src=x onerror=alert(1)>';
+    const json = JSON.stringify(createProjectFile(draft));
+    expect(parseProjectFile(json)).toEqual(draft);
+
+    const withUnknownField = JSON.parse(json);
+    withUnknownField.project.instructions = 'execute this';
+    expect(parseProjectFile(JSON.stringify(withUnknownField))).toBeNull();
+
+    const unknownVersion = JSON.parse(json);
+    unknownVersion.version = 2;
+    expect(parseProjectFile(JSON.stringify(unknownVersion))).toBeNull();
+    expect(parseProjectFile(`${json}${' '.repeat(10 * 1024 * 1024)}`)).toBeNull();
   });
 
   it('ignores empty lines and numbers exported actions within each phrase', () => {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 
@@ -53,18 +53,62 @@ describe('App security and editor basics', () => {
     expect(within(screen.getByRole('listbox', { name: /Mouvement de pieds/ })).queryByRole('option', { name: 'Supernova' })).not.toBeInTheDocument();
   });
 
-  it('guides through all nine editor zones in order and finishes the tour', () => {
+  it('guides through all ten editor zones in order and finishes the tour', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Comment ça marche ?' }));
-    const steps = ['fighters', 'assistants', 'movements', 'editor', 'project-info', 'phrases', 'lines', 'autosave', 'download'];
+    const steps = ['fighters', 'assistants', 'movements', 'editor', 'project-info', 'phrases', 'lines', 'autosave', 'import', 'download'];
 
     steps.forEach((target, index) => {
       const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveTextContent(new RegExp(`Étape ${index + 1} sur 9`, 'i'));
+      expect(dialog).toHaveTextContent(new RegExp(`Étape ${index + 1} sur 10`, 'i'));
       expect(document.querySelector(`[data-tour="${target}"]`)).toBeInTheDocument();
       fireEvent.click(within(dialog).getByRole('button', { name: index === steps.length - 1 ? 'Terminer' : 'Suivant' }));
     });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('imports JSON as inert text only after validating it and confirming replacement', async () => {
+    const { defaultDraft, createProjectFile } = await import('./lib/project');
+    const project = defaultDraft();
+    project.fighters[0].name = '<img src=x onerror=alert(1)>';
+    const file = new File([JSON.stringify(createProjectFile(project))], 'projet.json', { type: 'application/json' });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { container } = render(<App />);
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!input) throw new Error('JSON import input was not rendered');
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Nom du combattant 1' })).toHaveValue('<img src=x onerror=alert(1)>'));
+    expect(container.querySelector('img[src="x"]')).toBeNull();
+    expect(window.confirm).toHaveBeenCalledOnce();
+  });
+
+  it('does not replace the project when the JSON structure is invalid', async () => {
+    const { defaultDraft, createProjectFile } = await import('./lib/project');
+    const fileData = createProjectFile(defaultDraft()) as ReturnType<typeof createProjectFile> & { injected?: string };
+    fileData.injected = 'execute this';
+    const file = new File([JSON.stringify(fileData)], 'projet.json', { type: 'application/json' });
+    const confirm = vi.spyOn(window, 'confirm');
+    const { container } = render(<App />);
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!input) throw new Error('JSON import input was not rendered');
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/JSON est invalide/i);
+    expect(screen.getByRole('textbox', { name: 'Nom du combattant 1' })).toHaveValue('Combattant A');
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('opens the download choices as a disclosure and closes them with Escape', () => {
+    render(<App />);
+    const download = screen.getByRole('button', { name: /Télécharger le projet/ });
+    fireEvent.click(download);
+    expect(download).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Texte (.txt)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'PDF ASL-FFE (.pdf)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Projet Forge Chorégraphique (.json)' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(download).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('can cancel the tour and highlights the first-line drop zone when the project has no lines', () => {

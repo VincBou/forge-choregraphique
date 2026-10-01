@@ -10,6 +10,7 @@ export const MAX_DURATION_LENGTH = 30;
 export const MAX_FIGHTERS = 50;
 export const MAX_ASSISTANTS = 50;
 export const MAX_LINES = 500;
+export const MAX_PROJECT_FILE_BYTES = 10 * 1024 * 1024;
 
 export type MovementCategory = 'main' | 'pieds' | 'combine';
 
@@ -61,6 +62,12 @@ export type ProjectDraft = {
   fighters: Fighter[];
   assistants: Assistant[];
   phrases: PhraseDArmes[];
+};
+
+export type ProjectFile = {
+  format: 'forge-choregraphique';
+  version: 1;
+  project: ProjectDraft;
 };
 
 type LegacyLine = { id: string; attacker: string; action: string; details: string; defender: string };
@@ -182,6 +189,54 @@ export function isProjectDraft(value: unknown): value is ProjectDraft {
   const lineCount = { value: 0 };
   const previousEnd = { value: 0 };
   return draft.phrases.every((phrase) => isValidPhrase(phrase, ids, lineCount, previousEnd));
+}
+
+function hasExactKeys(value: unknown, keys: string[]): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const actual = Object.keys(value);
+  return actual.length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+}
+
+function sanitizeProjectDraft(value: unknown, rejectUnknown = true): ProjectDraft | null {
+  if (!isProjectDraft(value)) return null;
+  const draft = value;
+  const exactShape = hasExactKeys(draft, ['info', 'fighters', 'assistants', 'phrases'])
+    && hasExactKeys(draft.info, ['title', 'club', 'duration', 'oppositionDuration', 'notes', 'ensemble'])
+    && draft.fighters.every((fighter) => hasExactKeys(fighter, ['id', 'name', 'firstName', 'lastName', 'licenseNumber', 'captain']))
+    && draft.assistants.every((assistant) => hasExactKeys(assistant, ['id', 'firstName', 'lastName', 'licenseNumber', 'role']))
+    && draft.phrases.every((phrase) => hasExactKeys(phrase, ['id', 'end', 'lines'])
+      && phrase.lines.every((line) => hasExactKeys(line, ['id', 'attacker', 'handMovement', 'footMovement', 'details', 'defender', 'defenderMovement', 'defenderDetails'])));
+  if (rejectUnknown && !exactShape) return null;
+
+  return {
+    info: { title: draft.info.title, club: draft.info.club, duration: draft.info.duration, oppositionDuration: draft.info.oppositionDuration, notes: draft.info.notes, ensemble: draft.info.ensemble },
+    fighters: draft.fighters.map(({ id, name, firstName, lastName, licenseNumber, captain }) => ({ id, name, firstName, lastName, licenseNumber, captain })),
+    assistants: draft.assistants.map(({ id, firstName, lastName, licenseNumber, role }) => ({ id, firstName, lastName, licenseNumber, role })),
+    phrases: draft.phrases.map(({ id, end, lines }) => ({
+      id, end,
+      lines: lines.map(({ id: lineId, attacker, handMovement, footMovement, details, defender, defenderMovement, defenderDetails }) => ({
+        id: lineId, attacker, handMovement, footMovement, details, defender, defenderMovement, defenderDetails,
+      })),
+    })),
+  };
+}
+
+export function createProjectFile(project: ProjectDraft): ProjectFile {
+  const safeProject = sanitizeProjectDraft(project, false);
+  if (!safeProject) throw new TypeError('Invalid project draft');
+  return { format: 'forge-choregraphique', version: 1, project: safeProject };
+}
+
+export function parseProjectFile(json: string): ProjectDraft | null {
+  if (new TextEncoder().encode(json).byteLength > MAX_PROJECT_FILE_BYTES) return null;
+  try {
+    const value: unknown = JSON.parse(json.charCodeAt(0) === 0xfeff ? json.slice(1) : json);
+    if (!hasExactKeys(value, ['format', 'version', 'project'])
+      || value.format !== 'forge-choregraphique' || value.version !== 1) return null;
+    return sanitizeProjectDraft(value.project);
+  } catch {
+    return null;
+  }
 }
 
 function isV4Draft(value: unknown): value is { fighters: string[]; phrases: PhraseDArmes[] } {

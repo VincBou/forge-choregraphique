@@ -38,11 +38,16 @@
   {
     "id": "autosave",
     "title": "Le brouillon local",
-    "text": "Votre projet et ses informations générales sont enregistrés dans le stockage de ce navigateur, sur cet appareil. Le téléchargement actuel contient uniquement les actions chorégraphiques."
+    "text": "Votre projet et ses informations générales sont enregistrés dans le stockage de ce navigateur, sur cet appareil. Le format JSON permet de sauvegarder et de reprendre le projet complet."
+  },
+  {
+    "id": "import",
+    "title": "Importer un projet",
+    "text": "Importez un fichier JSON Forge Chorégraphique. Sa structure et sa version sont vérifiées avant de vous proposer le remplacement du projet actuel."
   },
   {
     "id": "download",
     "title": "Télécharger le projet",
-    "text": "Téléchargez le projet au format texte, avec les phrases, leurs timings et les actions numérotées. Les informations générales et les fiches des participants ne sont pas encore dans ce fichier."
+    "text": "Choisissez le texte pour les phrases et les actions, le PDF ASL-FFE pour une fiche de présentation, ou le JSON Forge Chorégraphique pour conserver et reprendre toutes les données du projet."
   }
 ]
