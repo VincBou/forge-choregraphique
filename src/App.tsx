@@ -25,6 +25,7 @@ import {
   normalizeSingleLine,
   STORAGE_KEY,
   V4_STORAGE_KEY,
+  V5_STORAGE_KEY,
   createProjectFile,
   parseProjectFile,
   MAX_PROJECT_FILE_BYTES,
@@ -33,6 +34,8 @@ import {
   type Assistant,
   type ProjectInfo,
   type MovementCategory,
+  type ChoreographySection,
+  type PhraseDArmes,
 } from './lib/project';
 
 type Movement = { nom: string; description: string; categorie: MovementCategory; caracteristiques?: string[] };
@@ -59,7 +62,9 @@ const movementCategories = new Map(movementList.map((movement) => [normalizeSear
 const initialState = loadDraft(undefined, movementCategories);
 const createEmptyLine = (): ChoreographyLine => ({ id: createLineId(), attacker: '', handMovement: '', footMovement: '', details: '', defender: '', defenderMovement: '', defenderDetails: '' });
 const createEmptyAssistant = (): Assistant => ({ id: createLineId(), firstName: '', lastName: '', licenseNumber: '', role: '' });
-const phraseStart = (phrases: typeof initialState.draft.phrases, index: number) => index === 0 ? 0 : phrases[index - 1].end;
+const phraseSections = (sections: ChoreographySection[]) => sections.filter((section): section is PhraseDArmes => section.type === 'phrase');
+const sectionStart = (sections: ChoreographySection[], index: number) => index === 0 ? 0 : sections[index - 1].end;
+const phraseStart = (sections: ChoreographySection[], index: number) => sectionStart(sections, index);
 const formatTiming = (value: number) => Number.isInteger(value) ? value.toFixed(1) : String(value);
 
 export default function App() {
@@ -131,7 +136,7 @@ export default function App() {
     if (!pendingPhraseFocus.current) return;
     document.querySelector<HTMLElement>(`[data-phrase-focus="${pendingPhraseFocus.current}"]`)?.focus();
     pendingPhraseFocus.current = null;
-  }, [draft.phrases]);
+  }, [draft.sections]);
 
   function changeDraft(nextDraft: typeof draft) {
     hasEdited.current = true;
@@ -151,15 +156,15 @@ export default function App() {
     setFighterEdits(({ [id]: _discarded, ...edits }) => edits);
     if (!fighter || !newName.trim() || fighter.name === newName) return;
     const fighters = draft.fighters.map((candidate) => candidate.id === id ? { ...candidate, name: newName } : candidate);
-    const phrases = fighter.name ? draft.phrases.map((phrase) => ({
-      ...phrase,
-      lines: phrase.lines.map((line) => ({
+    const sections = fighter.name ? draft.sections.map((section) => section.type === 'phrase' ? ({
+      ...section,
+      lines: section.lines.map((line) => ({
         ...line,
         attacker: line.attacker === fighter.name ? newName : line.attacker,
         defender: line.defender === fighter.name ? newName : line.defender,
       })),
-    })) : draft.phrases;
-    changeDraft({ ...draft, fighters, phrases });
+    }) : section) : draft.sections;
+    changeDraft({ ...draft, fighters, sections });
   }
 
   function addFighter() {
@@ -198,92 +203,160 @@ export default function App() {
   function updateLine(id: string, field: keyof Omit<ChoreographyLine, 'id'>, value: string) {
     const limit = field === 'details' ? MAX_DETAILS_LENGTH : MAX_NAME_LENGTH;
     const normalized = normalizeSingleLine(value, limit);
-    changeDraft({ ...draft, phrases: draft.phrases.map((phrase) => ({
-      ...phrase,
-      lines: phrase.lines.map((line) => line.id === id
+    changeDraft({ ...draft, sections: draft.sections.map((section) => section.type === 'phrase' ? ({
+      ...section,
+      lines: section.lines.map((line) => line.id === id
         ? { ...line, [field]: normalized, ...(field === 'handMovement' && isCombinedMovement(normalized) ? { footMovement: '' } : {}) }
         : line),
-    })) });
+    }) : section) });
     setExportError(null);
   }
 
   function addLine(phraseId: string, afterId?: string) {
-    const lineCount = draft.phrases.reduce((count, phrase) => count + phrase.lines.length, 0);
+    const lineCount = phraseSections(draft.sections).reduce((count, phrase) => count + phrase.lines.length, 0);
     if (lineCount >= MAX_LINES) return;
-    const phrases = draft.phrases.map((phrase) => {
-      if (phrase.id !== phraseId) return phrase;
-      const lines = [...phrase.lines];
+    const sections = draft.sections.map((section) => {
+      if (section.type !== 'phrase' || section.id !== phraseId) return section;
+      const lines = [...section.lines];
       const index = afterId ? lines.findIndex((line) => line.id === afterId) : lines.length - 1;
       lines.splice(index + 1, 0, createEmptyLine());
-      return { ...phrase, lines };
+      return { ...section, lines };
     });
-    changeDraft({ ...draft, phrases });
+    changeDraft({ ...draft, sections });
     setExportError(null);
   }
 
   function addPhrase() {
-    const end = draft.phrases.at(-1)?.end ?? 0;
-    changeDraft({ ...draft, phrases: [...draft.phrases, { id: createLineId(), end, lines: [] }] });
+    const end = draft.sections.at(-1)?.end ?? 0;
+    changeDraft({ ...draft, sections: [...draft.sections, { type: 'phrase', id: createLineId(), end, lines: [] }] });
     setExportError(null);
   }
 
-  function removePhrase(id: string) {
-    if (draft.phrases.length <= 1) return;
-    const index = draft.phrases.findIndex((phrase) => phrase.id === id);
-    if (index < 0) return;
-    const phrase = draft.phrases[index];
-    if (phrase.lines.some(hasStartedLine) && !window.confirm(`Supprimer Phrase d’armes ${index + 1} et ses lignes d’action ? Cette action ne peut pas être annulée.`)) return;
+  function addChoreographicTime() {
+    const end = draft.sections.at(-1)?.end ?? 0;
+    changeDraft({ ...draft, sections: [...draft.sections, { type: 'temps', id: createLineId(), end }] });
+    setExportError(null);
+  }
 
-    const duration = phrase.end - phraseStart(draft.phrases, index);
-    const phrases = draft.phrases.filter((candidate) => candidate.id !== id);
-    for (let next = index; next < phrases.length; next += 1) {
-      const previousEnd = next === 0 ? 0 : phrases[next - 1].end;
-      phrases[next] = { ...phrases[next], end: Math.max(previousEnd, phrases[next].end - duration) };
+  function removeChoreographicTime(id: string) {
+    const index = draft.sections.findIndex((section) => section.id === id && section.type === 'temps');
+    if (index < 0) return;
+    const section = draft.sections[index];
+    if (section.type !== 'temps') return;
+    const duration = section.end - sectionStart(draft.sections, index);
+    if (duration > 0 && !window.confirm(`Supprimer Temps chorégraphique ${draft.sections.slice(0, index + 1).filter((item) => item.type === 'temps').length} ? Les sections suivantes avanceront pour préserver leur durée.`)) return;
+    const sections = draft.sections.filter((candidate) => candidate.id !== id);
+    for (let next = index; next < sections.length; next += 1) sections[next] = { ...sections[next], end: Math.max(next ? sections[next - 1].end : 0, sections[next].end - duration) };
+    const shiftedIds = new Set(draft.sections.slice(index).map((candidate) => candidate.id));
+    setTimingEdits((edits) => Object.fromEntries(Object.entries(edits).filter(([sectionId]) => !shiftedIds.has(sectionId))));
+    changeDraft({ ...draft, sections });
+    setExportError(null);
+  }
+
+  function moveSection(id: string, offset: -1 | 1) {
+    const index = draft.sections.findIndex((section) => section.id === id);
+    const target = index + offset;
+    if (index < 0 || target < 0 || target >= draft.sections.length) return;
+    const durations = new Map(draft.sections.map((section, i) => [section.id, section.end - sectionStart(draft.sections, i)]));
+    const sections = [...draft.sections];
+    [sections[index], sections[target]] = [sections[target], sections[index]];
+    let end = 0;
+    for (const section of sections) {
+      end += durations.get(section.id) ?? 0;
+      section.end = end;
     }
-    pendingPhraseFocus.current = (phrases[index] ?? phrases[index - 1]).id;
-    const shiftedPhraseIds = new Set(draft.phrases.slice(index).map((candidate) => candidate.id));
+    changeDraft({ ...draft, sections });
+    setTimingEdits({});
+  }
+
+  function moveSectionTo(id: string, targetId: string, after: boolean) {
+    if (id === targetId) return;
+    const from = draft.sections.findIndex((section) => section.id === id);
+    const to = draft.sections.findIndex((section) => section.id === targetId);
+    if (from < 0 || to < 0) return;
+    const durations = new Map(draft.sections.map((section, index) => [section.id, section.end - sectionStart(draft.sections, index)]));
+    const sections = [...draft.sections];
+    const [section] = sections.splice(from, 1);
+    const targetIndex = sections.findIndex((item) => item.id === targetId);
+    sections.splice(targetIndex + (after ? 1 : 0), 0, section);
+    let end = 0;
+    for (const item of sections) { end += durations.get(item.id) ?? 0; item.end = end; }
+    changeDraft({ ...draft, sections });
+    setTimingEdits({});
+  }
+
+  function handleSectionDrop(event: DragEvent<HTMLElement>, targetId: string) {
+    const dragged = event.dataTransfer.getData('application/x-section');
+    if (!dragged) return;
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    moveSectionTo(dragged, targetId, event.clientY > rect.top + rect.height / 2);
+  }
+
+  function removePhrase(id: string) {
+    const phrases = phraseSections(draft.sections);
+    if (phrases.length <= 1) return;
+    const index = draft.sections.findIndex((section) => section.id === id && section.type === 'phrase');
+    if (index < 0) return;
+    const phrase = draft.sections[index];
+    if (phrase.type !== 'phrase') return;
+    const phraseNumber = phraseSections(draft.sections.slice(0, index + 1)).length;
+    if (phrase.lines.some(hasStartedLine) && !window.confirm(`Supprimer Phrase d’armes ${phraseNumber} et ses lignes d’action ? Cette action ne peut pas être annulée.`)) return;
+
+    const duration = phrase.end - phraseStart(draft.sections, index);
+    const sections = draft.sections.filter((candidate) => candidate.id !== id);
+    for (let next = index; next < sections.length; next += 1) {
+      const previousEnd = next === 0 ? 0 : sections[next - 1].end;
+      sections[next] = { ...sections[next], end: Math.max(previousEnd, sections[next].end - duration) };
+    }
+    pendingPhraseFocus.current = sections.slice(index).find((section) => section.type === 'phrase')?.id
+      ?? sections.slice(0, index).reverse().find((section) => section.type === 'phrase')?.id ?? null;
+    const shiftedPhraseIds = new Set(draft.sections.slice(index).map((candidate) => candidate.id));
     setTimingEdits((edits) => Object.fromEntries(Object.entries(edits).filter(([phraseId]) => !shiftedPhraseIds.has(phraseId))));
     setDropTarget(null);
-    changeDraft({ ...draft, phrases });
+    changeDraft({ ...draft, sections });
     setExportError(null);
   }
 
   function removeLine(id: string) {
-    changeDraft({ ...draft, phrases: draft.phrases.map((phrase) => ({
-      ...phrase,
-      lines: phrase.lines.filter((line) => line.id !== id),
-    })) });
+    changeDraft({ ...draft, sections: draft.sections.map((section) => section.type === 'phrase'
+      ? { ...section, lines: section.lines.filter((line) => line.id !== id) } : section) });
     setExportError(null);
   }
 
   function moveLineTo(lineId: string, targetPhraseIndex: number, targetLineId?: string, after = false) {
-    if (!draft.phrases[targetPhraseIndex]) return;
-    const phrases = draft.phrases.map((phrase) => ({ ...phrase, lines: [...phrase.lines] }));
+    const phrases = phraseSections(draft.sections);
+    if (!phrases[targetPhraseIndex]) return;
+    const sections = draft.sections.map((section) => section.type === 'phrase' ? { ...section, lines: [...section.lines] } : section);
     const sourcePhraseIndex = phrases.findIndex((phrase) => phrase.lines.some((line) => line.id === lineId));
     if (sourcePhraseIndex < 0 || (targetLineId && targetLineId === lineId)) return;
-    const sourceLines = phrases[sourcePhraseIndex].lines;
+    const sourcePhrase = sections.find((section) => section.type === 'phrase' && section.id === phrases[sourcePhraseIndex].id);
+    const targetPhrase = sections.find((section) => section.type === 'phrase' && section.id === phrases[targetPhraseIndex].id);
+    if (sourcePhrase?.type !== 'phrase' || targetPhrase?.type !== 'phrase') return;
+    const sourceLines = sourcePhrase.lines;
     const sourceIndex = sourceLines.findIndex((line) => line.id === lineId);
     const [line] = sourceLines.splice(sourceIndex, 1);
-    const targetLines = phrases[targetPhraseIndex].lines;
+    const targetLines = targetPhrase.lines;
     const targetIndex = targetLineId ? targetLines.findIndex((candidate) => candidate.id === targetLineId) : targetLines.length;
     targetLines.splice(Math.max(0, targetIndex + (after ? 1 : 0)), 0, line);
-    changeDraft({ ...draft, phrases });
+    changeDraft({ ...draft, sections });
     setDropTarget(null);
     setExportError(null);
   }
 
   function moveLineAdjacent(lineId: string, direction: -1 | 1) {
-    const phraseIndex = draft.phrases.findIndex((phrase) => phrase.lines.some((line) => line.id === lineId));
+    const phrases = phraseSections(draft.sections);
+    const phraseIndex = phrases.findIndex((phrase) => phrase.lines.some((line) => line.id === lineId));
     if (phraseIndex < 0) return;
-    const lines = draft.phrases[phraseIndex].lines;
+    const lines = phrases[phraseIndex].lines;
     const lineIndex = lines.findIndex((line) => line.id === lineId);
     if (direction < 0) {
       if (lineIndex > 0) moveLineTo(lineId, phraseIndex, lines[lineIndex - 1].id);
       else if (phraseIndex > 0) moveLineTo(lineId, phraseIndex - 1);
     } else if (lineIndex < lines.length - 1) {
       moveLineTo(lineId, phraseIndex, lines[lineIndex + 1].id, true);
-    } else if (phraseIndex < draft.phrases.length - 1) {
-      moveLineTo(lineId, phraseIndex + 1, draft.phrases[phraseIndex + 1].lines[0]?.id);
+    } else if (phraseIndex < phrases.length - 1) {
+      moveLineTo(lineId, phraseIndex + 1, phrases[phraseIndex + 1].lines[0]?.id);
     }
   }
 
@@ -304,35 +377,35 @@ export default function App() {
     moveLineTo(event.dataTransfer.getData('text/plain'), phraseIndex);
   }
 
-  function commitPhraseEnd(index: number, edited = timingEdits[draft.phrases[index].id], clearEdit = true) {
-    const phrase = draft.phrases[index];
-    if (edited === undefined) return;
-    if (clearEdit) setTimingEdits(({ [phrase.id]: _discarded, ...edits }) => edits);
+  function commitSectionEnd(index: number, edited = timingEdits[draft.sections[index]?.id], clearEdit = true) {
+    const section = draft.sections[index];
+    if (!section || edited === undefined) return;
+    if (clearEdit) setTimingEdits(({ [section.id]: _discarded, ...edits }) => edits);
     if (!edited.trim()) return;
     const value = Number(edited);
     if (!Number.isFinite(value) || value < 0) return;
 
-    const phrases = [...draft.phrases];
-    phrases[index] = { ...phrase, end: Math.max(phraseStart(phrases, index), value) };
-    for (let next = index + 1; next < phrases.length; next += 1) {
-      const start = phrases[next - 1].end;
-      if (phrases[next].end < start) phrases[next] = { ...phrases[next], end: start };
+    const sections = [...draft.sections];
+    sections[index] = { ...section, end: Math.max(sectionStart(sections, index), value) };
+    for (let next = index + 1; next < sections.length; next += 1) {
+      const start = sections[next - 1].end;
+      if (sections[next].end < start) sections[next] = { ...sections[next], end: start };
     }
-    changeDraft({ ...draft, phrases });
+    changeDraft({ ...draft, sections });
   }
 
   function handleDefenderBlur(id: string, defender: string) {
     if (defender.trim()) return;
-    const line = draft.phrases.flatMap((phrase) => phrase.lines).find((candidate) => candidate.id === id);
+    const line = phraseSections(draft.sections).flatMap((phrase) => phrase.lines).find((candidate) => candidate.id === id);
     if (!line || (!line.defenderMovement && !line.defenderDetails)) return;
     changeDraft({
       ...draft,
-      phrases: draft.phrases.map((phrase) => ({
-        ...phrase,
-        lines: phrase.lines.map((candidate) => candidate.id === id
+      sections: draft.sections.map((section) => section.type === 'phrase' ? ({
+        ...section,
+        lines: section.lines.map((candidate) => candidate.id === id
           ? { ...candidate, defenderMovement: '', defenderDetails: '' }
           : candidate),
-      })),
+      }) : section),
     });
     setExportError(null);
   }
@@ -349,6 +422,7 @@ export default function App() {
     let cleared = false;
     try {
       window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(V5_STORAGE_KEY);
       window.localStorage.removeItem(V4_STORAGE_KEY);
       window.localStorage.removeItem(PREVIOUS_STORAGE_KEY);
       window.localStorage.removeItem(OLDER_STORAGE_KEY);
@@ -426,7 +500,8 @@ export default function App() {
     }
   }
 
-  const lineCount = draft.phrases.reduce((count, phrase) => count + phrase.lines.length, 0);
+  const phrases = phraseSections(draft.sections);
+  const lineCount = phrases.reduce((count, phrase) => count + phrase.lines.length, 0);
 
   return (
     <main className="app-shell">
@@ -593,13 +668,26 @@ export default function App() {
             <span>ATTAQUANT</span><span>MOUVEMENT DE MAIN</span><span>MOUVEMENT DE PIEDS</span><span>INTENTION / DÉTAIL</span><span>DÉFENSEUR</span>
           </div>
           <div className="phrases-list">
-            {draft.phrases.map((phrase, phraseIndex) => {
-              const start = phraseStart(draft.phrases, phraseIndex);
+            {draft.sections.map((section, sectionIndex) => {
+              const start = sectionStart(draft.sections, sectionIndex);
+              if (section.type === 'temps') {
+                const timeNumber = draft.sections.slice(0, sectionIndex + 1).filter((item) => item.type === 'temps').length;
+                const timeName = `Temps chorégraphique ${timeNumber}`;
+                return <section className="phrase-group time-group" key={section.id} data-tour={timeNumber === 1 ? 'times' : undefined} onDragOver={(event) => { if (event.dataTransfer.types.includes('application/x-section')) event.preventDefault(); }} onDrop={(event) => handleSectionDrop(event, section.id)}>
+                  <div className="phrase-rail"><h3 draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-section', section.id); }}>{timeName}</h3><div className="phrase-timing"><span>Début</span><span>{formatTiming(start)}</span></div>
+                    <label className="phrase-timing" htmlFor={`time-end-${section.id}`}><span>Fin</span><input id={`time-end-${section.id}`} aria-label={`Fin de ${timeName}`} type="number" min={start} step="0.1" value={timingEdits[section.id] ?? formatTiming(section.end)} onFocus={() => setTimingEdits((edits) => ({ ...edits, [section.id]: formatTiming(section.end) }))} onChange={(event) => { const value = event.target.value; setTimingEdits((edits) => ({ ...edits, [section.id]: value })); commitSectionEnd(sectionIndex, value, false); }} onBlur={() => commitSectionEnd(sectionIndex)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); commitSectionEnd(sectionIndex); } if (event.key === 'Escape') setTimingEdits(({ [section.id]: _discarded, ...edits }) => edits); }} /></label>
+                    <div className="section-order"><button className="icon-button" type="button" aria-label={`Monter ${timeName}`} disabled={sectionIndex === 0} onClick={() => moveSection(section.id, -1)}>↑</button><button className="icon-button" type="button" aria-label={`Descendre ${timeName}`} disabled={sectionIndex === draft.sections.length - 1} onClick={() => moveSection(section.id, 1)}>↓</button></div>
+                    <button className="text-button delete-phrase" type="button" aria-label={`Supprimer ${timeName}`} onClick={() => removeChoreographicTime(section.id)}>Supprimer</button></div>
+                  <div className="time-placeholder">Ce temps ne contient pas de ligne d’action et ne compte pas dans le temps de combat.</div>
+                </section>;
+              }
+              const phrase = section;
+              const phraseIndex = phraseSections(draft.sections.slice(0, sectionIndex + 1)).length - 1;
               const phraseName = `Phrase d’armes ${phraseIndex + 1}`;
               return (
-                <section className="phrase-group" key={phrase.id} aria-labelledby={`phrase-title-${phrase.id}`} data-tour={phraseIndex === 0 ? 'phrases' : undefined}>
+                <section className="phrase-group" key={phrase.id} aria-labelledby={`phrase-title-${phrase.id}`} data-tour={phraseIndex === 0 ? 'phrases' : undefined} onDragOver={(event) => { if (event.dataTransfer.types.includes('application/x-section')) event.preventDefault(); }} onDrop={(event) => handleSectionDrop(event, phrase.id)}>
                   <div className="phrase-rail">
-                    <h3 id={`phrase-title-${phrase.id}`} tabIndex={-1} data-phrase-focus={phrase.id}>{phraseName}</h3>
+                    <h3 id={`phrase-title-${phrase.id}`} tabIndex={-1} data-phrase-focus={phrase.id} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-section', phrase.id); }}>{phraseName}</h3>
                     <div className="phrase-timing"><span>Début</span><span>{formatTiming(start)}</span></div>
                     <label className="phrase-timing" htmlFor={`phrase-end-${phrase.id}`}><span>Fin</span>
                       <input
@@ -613,11 +701,11 @@ export default function App() {
                         onChange={(event) => {
                           const value = event.target.value;
                           setTimingEdits((edits) => ({ ...edits, [phrase.id]: value }));
-                          commitPhraseEnd(phraseIndex, value, false);
+                          commitSectionEnd(sectionIndex, value, false);
                         }}
-                        onBlur={() => commitPhraseEnd(phraseIndex)}
+                        onBlur={() => commitSectionEnd(sectionIndex)}
                         onKeyDown={(event) => {
-                          if (event.key === 'Enter') { event.preventDefault(); commitPhraseEnd(phraseIndex); }
+                          if (event.key === 'Enter') { event.preventDefault(); commitSectionEnd(sectionIndex); }
                           if (event.key === 'Escape') setTimingEdits(({ [phrase.id]: _discarded, ...edits }) => edits);
                         }}
                       />
@@ -626,12 +714,13 @@ export default function App() {
                       className="text-button delete-phrase"
                       type="button"
                       aria-label={`Supprimer ${phraseName}`}
-                      title={draft.phrases.length === 1 ? 'Le projet doit conserver au moins une phrase d’armes.' : undefined}
-                      disabled={draft.phrases.length === 1}
+                      title={phrases.length === 1 ? 'Le projet doit conserver au moins une phrase d’armes.' : undefined}
+                      disabled={phrases.length === 1}
                       onClick={() => removePhrase(phrase.id)}
                     >
                       <span aria-hidden="true">×</span> Supprimer
                     </button>
+                    <div className="section-order"><button className="icon-button" type="button" aria-label={`Monter ${phraseName}`} disabled={sectionIndex === 0} onClick={() => moveSection(phrase.id, -1)}>↑</button><button className="icon-button" type="button" aria-label={`Descendre ${phraseName}`} disabled={sectionIndex === draft.sections.length - 1} onClick={() => moveSection(phrase.id, 1)}>↓</button></div>
                   </div>
                   <div
                     className={`phrase-lines${phrase.lines.length === 0 && dropTarget === `${phrase.id}:empty` ? ' is-drop-target' : ''}`}
@@ -644,7 +733,7 @@ export default function App() {
                       const beforeTarget = dropTarget === `${line.id}:before`;
                       const afterTarget = dropTarget === `${line.id}:after`;
                       const atFirst = lineIndex === 0 && phraseIndex === 0;
-                      const atLast = lineIndex === phrase.lines.length - 1 && phraseIndex === draft.phrases.length - 1;
+                      const atLast = lineIndex === phrase.lines.length - 1 && phraseIndex === phrases.length - 1;
                       return (
                         <div
                           className={`choreo-line${beforeTarget ? ' drop-before' : ''}${afterTarget ? ' drop-after' : ''}`}
@@ -691,10 +780,11 @@ export default function App() {
             })}
           </div>
           <button className="button button-muted add-phrase" type="button" onClick={addPhrase}><span aria-hidden="true">＋</span> Ajouter une Phrase d’armes</button>
+          <button className="button button-muted add-phrase" type="button" data-tour="times" onClick={addChoreographicTime}><span aria-hidden="true">＋</span> Ajouter un Temps chorégraphique</button>
           {exportError && <p className="validation-message" role="alert">{exportError}</p>}
           <div className="editor-footer">
             <span><kbd>＋</kbd> ajoute une ligne à la suite</span>
-            <span>{lineCount} {lineCount > 1 ? 'lignes' : 'ligne'} · {draft.phrases.length} phrases</span>
+            <span>{lineCount} {lineCount > 1 ? 'lignes' : 'ligne'} · {phrases.length} phrases · {draft.sections.filter((section) => section.type === 'temps').length} temps</span>
           </div>
         </section>
       </div>

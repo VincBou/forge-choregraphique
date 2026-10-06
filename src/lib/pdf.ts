@@ -34,7 +34,9 @@ export async function downloadProjectPdf(draft: ProjectDraft, selectedFormat: st
   const format: PdfPageFormat = (['A4-portrait', 'A4-landscape', 'A3-portrait', 'A3-landscape'] as string[]).includes(selectedFormat)
     ? selectedFormat as PdfPageFormat : 'A4-landscape';
   const [pageSize, pageOrientation] = format.split('-') as ['A4' | 'A3', 'portrait' | 'landscape'];
-  const actionCount = draft.phrases.reduce((count, phrase) => count + phrase.lines.filter(hasStartedLine).length, 0);
+  const phrases = draft.sections.filter((section) => section.type === 'phrase');
+  const times = draft.sections.filter((section) => section.type === 'temps');
+  const actionCount = phrases.reduce((count, phrase) => count + phrase.lines.filter(hasStartedLine).length, 0);
   const category = draft.fighters.length === 0 ? 'Non définie' : draft.fighters.length === 1 ? 'Kata' : draft.fighters.length === 2 ? 'Duel' : draft.info.ensemble ? 'Ensemble' : 'Bataille';
   const content: unknown[] = [
     { text: draft.info.title.trim() || 'Projet chorégraphique', style: 'title' },
@@ -42,10 +44,10 @@ export async function downloadProjectPdf(draft: ProjectDraft, selectedFormat: st
     { text: 'Informations générales', style: 'sectionTitle' },
     {
       table: {
-        widths: ['*', '*', '*', '*', '*', '*'],
+        widths: ['*', '*', '*', '*', '*', '*', '*'],
         body: [
-          ['Club', 'Catégorie', 'Durée', 'Durée d’opposition', 'Phrases', 'Actions'],
-          [safeText(draft.info.club), category, safeText(draft.info.duration), safeText(draft.info.oppositionDuration), String(draft.phrases.length), String(actionCount)],
+          ['Club', 'Catégorie', 'Durée', 'Durée d’opposition', 'Phrases', 'Temps chorégraphiques', 'Actions'],
+          [safeText(draft.info.club), category, safeText(draft.info.duration), safeText(draft.info.oppositionDuration), String(phrases.length), String(times.length), String(actionCount)],
         ],
       }, layout: 'lightHorizontalLines',
     },
@@ -74,12 +76,20 @@ export async function downloadProjectPdf(draft: ProjectDraft, selectedFormat: st
   ];
 
   let start = 0;
-  for (const [index, phrase] of draft.phrases.entries()) {
+  let phraseNumber = 0;
+  let timeNumber = 0;
+  for (const section of draft.sections) {
+    const number = section.type === 'phrase' ? ++phraseNumber : ++timeNumber;
     content.push(
-      { text: `Phrase d’armes ${index + 1}`, style: 'sectionTitle', pageBreak: 'before' },
-      { columns: [{ text: `${formatTime(start)} · Début`, style: 'body' }, { text: `${formatTime(phrase.end)} · Fin`, alignment: 'right', style: 'body' }], margin: [0, 0, 0, 10] },
+      { text: section.type === 'phrase' ? `Phrase d’armes ${number}` : `Temps chorégraphique ${number}`, style: 'sectionTitle', pageBreak: 'before' },
+      { columns: [{ text: `${formatTime(start)} · Début`, style: 'body' }, { text: `${formatTime(section.end)} · Fin`, alignment: 'right', style: 'body' }], margin: [0, 0, 0, 10] },
     );
-    const lines = phrase.lines.filter(hasStartedLine);
+    if (section.type === 'temps') {
+      content.push({ text: 'Temps chorégraphique sans action de combat.', style: 'body', italics: true });
+      start = section.end;
+      continue;
+    }
+    const lines = section.lines.filter(hasStartedLine);
     if (lines.length) {
       content.push({
         table: {
@@ -94,7 +104,7 @@ export async function downloadProjectPdf(draft: ProjectDraft, selectedFormat: st
     } else {
       content.push({ text: 'Aucune action renseignée.', style: 'body', italics: true });
     }
-    start = phrase.end;
+    start = section.end;
   }
 
   const pdf = pdfMake.createPdf({

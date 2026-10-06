@@ -121,6 +121,11 @@ h1 { margin-bottom: 0; font: 600 19px Arial, sans-serif; letter-spacing: -.03em;
 .phrase-rail { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 13px 11px; border: 1px solid #e9ad5630; border-radius: 9px; background: linear-gradient(160deg, #e9ad560d, #ffffff03); }
 .phrase-rail h3 { margin: 0; color: var(--accent-bright); font: 600 12px Arial, sans-serif; line-height: 1.4; }
 .phrase-rail h3:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 3px; }
+.phrase-rail h3[draggable] { cursor: grab; }
+.section-order { display: flex; justify-content: flex-end; gap: 3px; }
+.time-group .phrase-rail { border-color: #82a8fc30; background: linear-gradient(160deg, #82a8fc0d, #ffffff03); }
+.time-group .phrase-rail h3 { color: #a9c2ff; }
+.time-placeholder { display: flex; align-items: center; padding: 16px; border: 1px dashed #82a8fc2a; border-radius: 9px; color: #8993a4; font-size: 11px; }
 .delete-phrase { margin-top: auto; color: var(--danger); }
 .delete-phrase:hover { color: #ffabb3; }
 .delete-phrase:disabled { opacity: .4; cursor: not-allowed; }

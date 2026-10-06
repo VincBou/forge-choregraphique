@@ -30,6 +30,11 @@
     "text": "Une phrase regroupe plusieurs lignes d’action. Son timing de fin détermine le début de la suivante. Le bouton sous le projet permet d’ajouter une phrase. Le bouton Supprimer dans son encart efface la phrase et ses lignes, après confirmation si elle contient des actions ; les phrases suivantes avancent pour préserver leur durée."
   },
   {
+    "id": "times",
+    "title": "Les temps chorégraphiques",
+    "text": "Ajoutez des temps dédiés aux passages chorégraphiques sans action. Ils possèdent un début et une fin, peuvent être déplacés dans la chronologie et ne comptent pas dans le calcul de la durée d’opposition."
+  },
+  {
     "id": "lines",
     "title": "Les lignes d’action",
     "text": "Saisissez l’attaquant, ses mouvements et ses détails, puis éventuellement un défenseur et sa réaction. Le bouton + ajoute une ligne ; les flèches ou le glisser-déposer permettent de la déplacer.",
