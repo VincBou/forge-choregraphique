@@ -53,6 +53,18 @@ describe('App security and editor basics', () => {
     expect(within(screen.getByRole('listbox', { name: /Mouvement de pieds/ })).queryByRole('option', { name: 'Supernova' })).not.toBeInTheDocument();
   });
 
+  it('opens the read-only representation view and returns to the same editor draft', () => {
+    render(<App />);
+    const attacker = screen.getByRole('combobox', { name: 'Attaquant, ligne 1.1' });
+    fireEvent.change(attacker, { target: { value: 'Combattant A' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Vue Représentation' }));
+    expect(screen.getByRole('heading', { name: 'Vue Représentation' })).toBeInTheDocument();
+    expect(screen.getByText(/Combattant A/)).toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retour à l’éditeur' }));
+    expect(screen.getByRole('combobox', { name: 'Attaquant, ligne 1.1' })).toHaveValue('Combattant A');
+  });
+
   it('guides through all ten editor zones in order and finishes the tour', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Comment ça marche ?' }));

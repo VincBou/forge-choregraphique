@@ -194,6 +194,40 @@ kbd { padding: 2px 5px; margin-right: 5px; border: 1px solid #ffffff1a; border-r
 .pdf-dialog select { width: 100%; height: 38px; padding: 0 9px; border: 1px solid #ffffff18; border-radius: 6px; color: var(--text); background: #10131a; }
 .pdf-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 
+.representation-shell { width: min(1100px, 100%); min-height: 100dvh; padding: 0 28px 48px; margin: 0 auto; }
+.representation-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 20px 0; }
+.representation-header h1 { font-size: 22px; }
+.representation-title { margin: 6px 0 0; color: #aab3c2; font-size: 13px; }
+.representation-clock { position: sticky; top: 0; z-index: 15; display: grid; justify-items: center; gap: 13px; padding: 23px 18px 15px; margin: 0 -12px 28px; border: 1px solid #e9ad5640; border-radius: 12px; background: #151922f2; box-shadow: 0 10px 30px #0005; backdrop-filter: blur(12px); transition: padding .25s ease, gap .25s ease, margin .25s ease; }
+.clock-readout { color: var(--accent-bright); font: 600 76px/1 Consolas, monospace; font-variant-numeric: tabular-nums; transition: color .2s ease, font-size .25s ease; }
+.clock-readout span { color: #aab3c2; font-size: .55em; }
+.clock-controls { display: flex; gap: 9px; }
+.clock-status { margin: 0; color: #919bad; font-size: 11px; text-align: center; }
+.timeline-complete { margin: -6px 0 0; color: #a9c2ff; font-size: 12px; font-weight: 600; }
+.representation-clock.is-compact { justify-items: start; grid-template-columns: auto 1fr; align-items: center; gap: 8px 17px; padding: 10px 17px; margin-bottom: 19px; }
+.is-compact .clock-readout { font-size: 37px; }
+.is-compact .clock-controls { grid-column: 2; grid-row: 1; }
+.is-compact .clock-status, .is-compact .timeline-complete { grid-column: 1 / -1; justify-self: center; }
+.representation-clock.is-overtime { border-color: #ef8490a0; box-shadow: 0 0 25px #ef849018, 0 10px 30px #0005; }
+.is-overtime .clock-readout, .is-overtime .clock-readout span { color: #ff707d; }
+.representation-project { display: flex; flex-direction: column; gap: 18px; }
+.representation-section { padding: 14px 18px; border-left: 3px solid #ffffff16; border-radius: 3px 9px 9px 3px; background: #ffffff04; scroll-margin-top: 155px; }
+.representation-section.is-active { border-left-color: var(--accent); background: linear-gradient(90deg, #e9ad5610, #ffffff04 70%); }
+.representation-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid #ffffff12; }
+.representation-section-heading h2 { margin: 0; color: #c0c8d6; font-size: 18px; transition: color .25s ease, font-size .3s ease, font-weight .3s ease; }
+.representation-section.is-active .representation-section-heading h2 { color: var(--accent-bright); font-size: 25px; font-weight: 700; }
+.representation-section-heading > span { color: #7c8799; font: 12px Consolas, monospace; white-space: nowrap; }
+.representation-line { display: flex; align-items: baseline; gap: 12px; padding: 6px 9px; margin: 1px 0; border-radius: 6px; color: #c5cbd5; font-size: 16px; line-height: 1.45; transition: font-size .3s ease, font-weight .3s ease, color .3s ease, background-color .3s ease; scroll-margin-top: 155px; }
+.representation-line-number { flex: 0 0 34px; color: #727d8e; font: 11px Consolas, monospace; }
+.representation-line.is-neighbor-1 { font-size: 20px; }
+.representation-line.is-neighbor-2 { font-size: 18px; }
+.representation-line.is-current { color: #fff4df; background: #e9ad5615; font-size: 26px; font-weight: 700; }
+.representation-time-label { margin: 12px 0 4px; color: #8faef8; font-size: 16px; transition: font-size .3s ease, font-weight .3s ease; }
+.representation-time-label.is-current { font-size: 25px; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) {
+  .representation-clock, .clock-readout, .representation-section-heading h2, .representation-line, .representation-time-label { transition: none; }
+}
+
 @media (max-width: 1120px) {
   .app-shell { padding: 0 26px; }
   .workspace { grid-template-columns: 250px minmax(0, 1fr); gap: 17px; }
@@ -208,6 +242,26 @@ kbd { padding: 2px 5px; margin-right: 5px; border: 1px solid #ffffff1a; border-r
   .editor { min-height: 380px; }
 }
 @media (max-width: 650px) {
+  .representation-shell { padding: 0 14px 28px; }
+  .representation-header { align-items: flex-start; padding: 14px 0; }
+  .representation-header h1 { font-size: 17px; }
+  .representation-header .button { flex: 0 0 auto; padding: 0 9px; font-size: 10px; }
+  .representation-clock { margin: 0 -5px 18px; padding: 19px 12px 13px; }
+  .clock-readout { font-size: 62px; }
+  .representation-clock.is-compact { grid-template-columns: auto 1fr; gap: 7px; padding: 9px; }
+  .is-compact .clock-readout { font-size: 30px; }
+  .clock-controls { gap: 6px; }
+  .clock-controls .button { min-height: 35px; padding: 0 9px; font-size: 10px; }
+  .representation-section { padding: 11px 9px; scroll-margin-top: 135px; }
+  .representation-section-heading h2 { font-size: 15px; }
+  .representation-section.is-active .representation-section-heading h2 { font-size: 20px; }
+  .representation-section-heading > span { font-size: 10px; }
+  .representation-line { gap: 6px; padding: 6px 4px; font-size: 13px; }
+  .representation-line-number { flex-basis: 29px; font-size: 9px; }
+  .representation-line.is-neighbor-1 { font-size: 16px; }
+  .representation-line.is-neighbor-2 { font-size: 14px; }
+  .representation-line.is-current { font-size: 19px; }
+  .representation-time-label.is-current { font-size: 20px; }
   .app-shell { padding: 0 15px; }
   .topbar { min-height: 82px; flex-wrap: wrap; padding: 13px 0; }
   .brand-mark { width: 35px; height: 35px; }

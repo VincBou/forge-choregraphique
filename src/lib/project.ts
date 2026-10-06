@@ -490,7 +490,7 @@ function formatTime(value: number): string {
   return Number.isInteger(value) ? value.toFixed(1) : String(value);
 }
 
-function formatLine(line: ChoreographyLine): string {
+export function formatChoreographyLine(line: ChoreographyLine): string {
   const details = line.details.trim();
   const defender = line.defender.trim();
   const movements = [line.handMovement.trim(), line.footMovement.trim()].filter(Boolean).join(' ');
@@ -516,7 +516,7 @@ export function formatProject(draft: ProjectDraft): string {
     const lines = section.lines.filter(hasStartedLine);
     if (lines.length) {
       output.push(`${formatTime(start)} - Début Phrase ${number}`);
-      lines.forEach((line, index) => output.push(`${number}.${index + 1} - ${formatLine(line)}`));
+      lines.forEach((line, index) => output.push(`${number}.${index + 1} - ${formatChoreographyLine(line)}`));
       output.push(`${formatTime(section.end)} - Fin Phrase ${number}`);
       output.push('');
     }

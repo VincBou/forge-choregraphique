@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent 
 import movementData from './data/mouvements.json';
 import AutocompleteInput from './components/AutocompleteInput';
 import GuidedTour from './components/GuidedTour';
+import RepresentationView from './components/RepresentationView';
 import {
   createLineId,
   calculateOppositionDuration,
@@ -79,6 +80,8 @@ export default function App() {
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
   const [pdfFormat, setPdfFormat] = useState('A4-landscape');
+  const [representationOpen, setRepresentationOpen] = useState(false);
+  const [representationElapsedMs, setRepresentationElapsedMs] = useState(0);
   const hasEdited = useRef(false);
   const pendingPhraseFocus = useRef<string | null>(null);
   const downloadMenuRef = useRef<HTMLDivElement>(null);
@@ -141,6 +144,7 @@ export default function App() {
   function changeDraft(nextDraft: typeof draft) {
     hasEdited.current = true;
     setDraft(nextDraft);
+    setRepresentationElapsedMs(0);
     setNotice(null);
   }
 
@@ -431,6 +435,7 @@ export default function App() {
     } catch { /* State reset below still works for this session. */ }
     hasEdited.current = false;
     setDraft(defaultDraft());
+    setRepresentationElapsedMs(0);
     setNotice(cleared ? 'Le brouillon local a été effacé.' : 'Le brouillon local n’a pas pu être effacé de ce navigateur.');
     setExportError(null);
   }
@@ -472,6 +477,7 @@ export default function App() {
       if (!window.confirm('Remplacer le projet actuel par celui du fichier JSON ? Cette action ne peut pas être annulée.')) return;
       hasEdited.current = true;
       setDraft(importedDraft);
+      setRepresentationElapsedMs(0);
       setNotice('Le projet JSON a été importé.');
       setExportError(null);
       setOpenDescription(null);
@@ -503,6 +509,11 @@ export default function App() {
   const phrases = phraseSections(draft.sections);
   const lineCount = phrases.reduce((count, phrase) => count + phrase.lines.length, 0);
 
+  if (representationOpen) return <RepresentationView project={draft} initialElapsedMs={representationElapsedMs} onBack={(elapsed) => {
+    setRepresentationElapsedMs(elapsed);
+    setRepresentationOpen(false);
+  }} />;
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -513,6 +524,7 @@ export default function App() {
         </div>
         <div className="topbar-actions">
           <button className="button button-muted" type="button" onClick={() => setTourOpen(true)}>Comment ça marche ?</button>
+          <button className="button button-muted" type="button" onClick={() => { setTourOpen(false); setRepresentationOpen(true); }}>Vue Représentation</button>
           <button className="button button-muted" type="button" onClick={clearLocalProject}>Effacer le brouillon local</button>
           <button className="button button-muted" type="button" data-tour="import" onClick={() => importInputRef.current?.click()}>Importer JSON</button>
           <input ref={importInputRef} type="file" hidden accept=".json,application/json" aria-label="Importer un projet JSON" onChange={importJson} />

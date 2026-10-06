@@ -4,6 +4,7 @@ Application web à page unique pour écrire un projet chorégraphique de sabre l
 
 ## Utiliser l’éditeur
 
+- Le bouton **Vue Représentation**, à côté de la visite guidée, ouvre une lecture seule du projet. Son chronomètre suit les horaires des phrases et des temps chorégraphiques, répartit chaque phrase uniformément entre ses actions commencées et surligne l’action estimée. Le champ **Durée** sert au dépassement ; s’il est inutilisable, la fin de la chronologie sert de seuil. Le chrono est temporaire, revient en pause à l’éditeur et repart de zéro après une modification du projet.
 - Le bouton **Comment ça marche ?** lance une visite guidée des principaux panneaux. Utilisez **Suivant** pour avancer, **Annuler** ou Échap pour quitter. Les textes des étapes se modifient dans `src/data/tutoriel.json`.
 - Le tutoriel passe par les combattants, les assistants/figurants, les mouvements, le projet, les informations générales, les phrases, les temps chorégraphiques, les lignes, le brouillon local, l’import et le téléchargement.
 - L’équipe commence avec « Combattant A » et « Combattant B ». Chaque nom utilisé dans les actions possède une fiche FFE repliable avec prénom, nom, licence et statut de capitaine. Le nom d’action reste indépendant ; son renommage par Entrée ou perte de focus met à jour ses occurrences exactes dans les rôles Attaquant et Défenseur.

@@ -2,6 +2,8 @@
 
 ## Project Structure & Sources
 
+The read-only representation screen is `src/components/RepresentationView.tsx`; its duration and active timeline calculations are in `src/lib/representation.ts`.
+
 This React, TypeScript, and Vite app keeps its editor in `src/App.tsx`, autocomplete and guided tour in `src/components/`, project validation, migration, JSON import and text export in `src/lib/project.ts`, PDF generation in `src/lib/pdf.ts`, and styles in `src/styles.css`. Movement and tour content live in `src/data/mouvements.json` and `src/data/tutoriel.json`; category icons are SVG files in `public/resources/icons/`. `Dockerfile` builds the static site, `compose.yaml` runs it, and `nginx/default.conf` configures the static server and response headers. The FFE source used for guard positions, footwork, combined techniques, and offensive actions is the *Sabre Laser — Livret 1, Cahier technique* PDF (v02.7.2), located beside this repository in the current workspace. Keep lexicon descriptions faithful to the corresponding chapters. Do not commit generated `dist/` files.
 
 ## Build, Test & Development Commands
@@ -18,6 +20,8 @@ This React, TypeScript, and Vite app keeps its editor in `src/App.tsx`, autocomp
 Use two-space indentation, React function components, descriptive camelCase names, and French UI text. Movement records have `nom`, `description`, and `categorie` (`main`, `pieds`, or `combine`), and may have `caracteristiques`, an optional list of detail suggestions. In the free-detail fields, offer those suggestions only for a matching movement and replace only the comma-delimited segment at the caret. Preserve other text and free entry. A combined movement is selected in the hand field and clears the foot field. Fighter action names remain separate from FFE identity details; committing a name on Enter or blur replaces exact attacker and defender matches. Project metadata, fighters, assistants, and ordered phrase/time sections belong to the local draft. Keep field normalization, limits, strict JSON import checks, migrations and text export in `src/lib/project.ts`. Imports use the `forge-choregraphique` version 2 envelope; version 1 remains importable. Files are limited to 10 MiB and must be copied from known fields before replacing the draft. Drafts use `forgechoree.project.v6`, contain at least one phrase, and derive each section start from the previous end. Opposition duration sums only timed phrases containing a started line; choreographic times and empty phrases do not count.
 
 ## Testing Guidelines
+
+Cover the representation clock controls, section/action timing boundaries, duration fallback, and paused return to the editor when changing that view.
 
 Place focused `.test.ts` or `.test.tsx` files beside the code they cover. Exercise editor and tour behavior, metadata and participant details, section timing and order, JSON schema rejection and round trips, PDF layouts, import cancellation and storage failure, and text export where affected. Empty phrases stay editable but are omitted from TXT/PDF action tables; movement lines must belong to a phrase. Run `npm test` and `npm run build` for application changes.
 
