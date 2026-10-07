@@ -524,7 +524,7 @@ export default function App() {
         </div>
         <div className="topbar-actions">
           <button className="button button-muted" type="button" onClick={() => setTourOpen(true)}>Comment ça marche ?</button>
-          <button className="button button-muted" type="button" onClick={() => { setTourOpen(false); setRepresentationOpen(true); }}>Vue Représentation</button>
+          <button className="button button-muted" type="button" data-tour="representation" onClick={() => { setTourOpen(false); setRepresentationOpen(true); }}>Vue Représentation</button>
           <button className="button button-muted" type="button" onClick={clearLocalProject}>Effacer le brouillon local</button>
           <button className="button button-muted" type="button" data-tour="import" onClick={() => importInputRef.current?.click()}>Importer JSON</button>
           <input ref={importInputRef} type="file" hidden accept=".json,application/json" aria-label="Importer un projet JSON" onChange={importJson} />

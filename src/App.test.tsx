@@ -65,18 +65,21 @@ describe('App security and editor basics', () => {
     expect(screen.getByRole('combobox', { name: 'Attaquant, ligne 1.1' })).toHaveValue('Combattant A');
   });
 
-  it('guides through all ten editor zones in order and finishes the tour', () => {
+  it('guides through all twelve editor zones in order and finishes the tour', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Comment ça marche ?' }));
-    const steps = ['fighters', 'assistants', 'movements', 'editor', 'project-info', 'phrases', 'times', 'lines', 'autosave', 'import', 'download'];
+    const steps = ['fighters', 'assistants', 'movements', 'editor', 'project-info', 'phrases', 'times', 'lines', 'autosave', 'import', 'download', 'representation'];
 
     steps.forEach((target, index) => {
       const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveTextContent(new RegExp(`Étape ${index + 1} sur 11`, 'i'));
+      expect(dialog).toHaveTextContent(new RegExp(`Étape ${index + 1} sur 12`, 'i'));
       expect(document.querySelector(`[data-tour="${target}"]`)).toBeInTheDocument();
+      if (target === 'representation') expect(dialog).toHaveTextContent(/lecture seule pendant une répétition/i);
       fireEvent.click(within(dialog).getByRole('button', { name: index === steps.length - 1 ? 'Terminer' : 'Suivant' }));
     });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Vue Représentation' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Vue Représentation' })).not.toBeInTheDocument();
   });
 
   it('imports JSON as inert text only after validating it and confirming replacement', async () => {

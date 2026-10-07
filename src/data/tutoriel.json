@@ -54,5 +54,10 @@
     "id": "download",
     "title": "Télécharger le projet",
     "text": "Choisissez le texte pour les phrases et les actions, le PDF ASL-FFE pour une fiche de présentation, ou le JSON Forge Chorégraphique pour conserver et reprendre toutes les données du projet."
+  },
+  {
+    "id": "representation",
+    "title": "La Vue Représentation",
+    "text": "Ouvrez cette vue pour suivre votre projet en lecture seule pendant une répétition. Le chronomètre met en évidence la phrase d’armes ou le temps chorégraphique en cours et estime la ligne d’action correspondante. Vous pouvez lancer, mettre en pause et réinitialiser le chronomètre, puis revenir à l’éditeur."
   }
 ]
