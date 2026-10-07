@@ -53,7 +53,7 @@
   {
     "id": "download",
     "title": "Télécharger le projet",
-    "text": "Choisissez le texte pour les phrases et les actions, le PDF ASL-FFE pour une fiche de présentation, ou le JSON Forge Chorégraphique pour conserver et reprendre toutes les données du projet."
+    "text": "Choisissez le Texte (.txt) pour les phrases et les actions sous forme de phrases, le PDF ASL-FFE pour une fiche de présentation, ou le JSON Forge Chorégraphique pour conserver et reprendre toutes les données du projet."
   },
   {
     "id": "representation",
