@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   calculateOppositionDuration,
+  calculateProjectCategory,
   createProjectFile,
   defaultDraft,
   formatProject,
@@ -38,6 +39,26 @@ const draftWithLines = (lines: ChoreographyLine[]) => {
 };
 
 describe('project formatting and validation', () => {
+  it('calculates categories from each non-empty FFE field', () => {
+    const blank = defaultDraft().fighters[0];
+    const fichaFields = [
+      { ...blank, firstName: 'Alice' },
+      { ...blank, lastName: 'Martin' },
+      { ...blank, licenseNumber: '12345' },
+      { ...blank, captain: true },
+    ];
+    const whitespaceOnly = { ...blank, name: 'Nom de projet', firstName: '  ', lastName: '\t', licenseNumber: '\n' };
+
+    expect(calculateProjectCategory([], false)).toBe('Kata');
+    expect(calculateProjectCategory([blank, whitespaceOnly], true)).toBe('Kata');
+    fichaFields.forEach((fighter) => expect(calculateProjectCategory([fighter, { ...blank, lastName: 'Martin' }], false)).toBe('Duel'));
+    expect(calculateProjectCategory([fichaFields[0]], false)).toBe('Kata');
+    expect(calculateProjectCategory([fichaFields[0]], true)).toBe('Kata');
+    expect(calculateProjectCategory([fichaFields[0], fichaFields[1]], true)).toBe('Duel');
+    expect(calculateProjectCategory([fichaFields[0], fichaFields[1], fichaFields[3]], false)).toBe('Bataille');
+    expect(calculateProjectCategory([fichaFields[0], fichaFields[1], fichaFields[3]], true)).toBe('Ensemble');
+  });
+
   it('starts with the two default fighters and one empty line', () => {
     const draft = defaultDraft();
     expect(draft.fighters.map(({ name }) => name)).toEqual(['Combattant A', 'Combattant B']);

@@ -19,6 +19,19 @@ describe('PDF export', () => {
     expect(click.mock.instances[0]).toHaveProperty('download', 'projet-choregraphique.pdf');
   });
 
+  it('uses the FFE based category in the exported project summary', async () => {
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:project-pdf'), revokeObjectURL: vi.fn() });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const createPdf = vi.spyOn(pdfMake, 'createPdf').mockReturnValue({ getBlob: async () => new Blob() } as never);
+    const project = defaultDraft();
+    project.fighters[0].firstName = 'Alice';
+    project.fighters[1].licenseNumber = '12345';
+
+    await downloadProjectPdf(project, 'A4-landscape');
+
+    expect(JSON.stringify(createPdf.mock.calls[0][0])).toContain('Duel');
+  });
+
   it('includes attacker and defender targets beside their movements', async () => {
     vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:project-pdf'), revokeObjectURL: vi.fn() });
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);

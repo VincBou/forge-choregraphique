@@ -1,7 +1,7 @@
 import pdfMake from 'pdfmake/build/pdfmake.js';
 import pdfFonts from 'pdfmake/build/vfs_fonts.js';
 import type { ProjectDraft, ChoreographyLine } from './project';
-import { hasStartedLine } from './project';
+import { calculateProjectCategory, hasStartedLine } from './project';
 
 type PdfPageFormat = 'A4-portrait' | 'A4-landscape' | 'A3-portrait' | 'A3-landscape';
 type PdfCell = { text: string; fillColor?: string; bold?: boolean; color?: string };
@@ -39,7 +39,7 @@ export async function downloadProjectPdf(draft: ProjectDraft, selectedFormat: st
   const phrases = draft.sections.filter((section) => section.type === 'phrase');
   const times = draft.sections.filter((section) => section.type === 'temps');
   const actionCount = phrases.reduce((count, phrase) => count + phrase.lines.filter(hasStartedLine).length, 0);
-  const category = draft.fighters.length === 0 ? 'Non définie' : draft.fighters.length === 1 ? 'Kata' : draft.fighters.length === 2 ? 'Duel' : draft.info.ensemble ? 'Ensemble' : 'Bataille';
+  const category = calculateProjectCategory(draft.fighters, draft.info.ensemble);
   const content: unknown[] = [
     { text: draft.info.title.trim() || 'Projet chorégraphique', style: 'title' },
     { text: 'Sabre Laser · Dossier chorégraphique ASL-FFE', style: 'subtitle' },

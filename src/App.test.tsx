@@ -86,6 +86,8 @@ describe('App security and editor basics', () => {
     const { defaultDraft, createProjectFile } = await import('./lib/project');
     const project = defaultDraft();
     project.fighters[0].name = '<img src=x onerror=alert(1)>';
+    project.fighters[0].firstName = 'Alice';
+    project.fighters[1].licenseNumber = '12345';
     const file = new File([JSON.stringify(createProjectFile(project))], 'projet.json', { type: 'application/json' });
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     const { container } = render(<App />);
@@ -94,6 +96,7 @@ describe('App security and editor basics', () => {
     fireEvent.change(input, { target: { files: [file] } });
 
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'Nom du combattant 1' })).toHaveValue('<img src=x onerror=alert(1)>'));
+    expect(screen.getByText('Duel')).toBeInTheDocument();
     expect(container.querySelector('img[src="x"]')).toBeNull();
     expect(window.confirm).toHaveBeenCalledOnce();
   });
@@ -363,6 +366,11 @@ describe('App security and editor basics', () => {
   it('stores project information and assistant identities in the local draft', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Ajouter un combattant' }));
+    expect(screen.getByText('Kata')).toBeInTheDocument();
+    screen.getAllByText('Fiche FFE').forEach((summary) => fireEvent.click(summary));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Prénom du combattant 1' }), { target: { value: 'Alice' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Nom de famille du combattant 2' }), { target: { value: 'Martin' } });
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Capitaine' })[2]);
     expect(screen.getByText('Bataille')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Mouvement d’ensemble' }));
     expect(screen.getByText('Ensemble')).toBeInTheDocument();
@@ -376,6 +384,26 @@ describe('App security and editor basics', () => {
     const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v9') ?? '{}');
     expect(savedDraft.info).toMatchObject({ title: 'Le duel', notes: 'Une intrigue\nUne musique', ensemble: true });
     expect(savedDraft.assistants[0]).toMatchObject({ firstName: 'Sam', role: 'Figurant' });
+  });
+
+  it('ignores declared fighter names and recalculates when FFE information is cleared or removed', () => {
+    render(<App />);
+    expect(screen.getByText('Kata')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Nom du combattant 1' }), { target: { value: 'Alice' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter un combattant' }));
+    expect(screen.getByText('Kata')).toBeInTheDocument();
+    screen.getAllByText('Fiche FFE').forEach((summary) => fireEvent.click(summary));
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Prénom du combattant 1' }), { target: { value: 'Alice' } });
+    expect(screen.getByText('Kata')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Nom de famille du combattant 2' }), { target: { value: 'Martin' } });
+    expect(screen.getByText('Duel')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Nom de famille du combattant 2' }), { target: { value: '   ' } });
+    expect(screen.getByText('Kata')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Nom de famille du combattant 2' }), { target: { value: 'Martin' } });
+    expect(screen.getByText('Duel')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer le combattant 2' }));
+    expect(screen.getByText('Kata')).toBeInTheDocument();
   });
 
   it('calculates opposition duration on demand from the entered phrase timings', () => {

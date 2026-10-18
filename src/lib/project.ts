@@ -27,6 +27,16 @@ export type Fighter = {
   captain: boolean;
 };
 
+export type ProjectCategory = 'Kata' | 'Duel' | 'Ensemble' | 'Bataille';
+
+export function calculateProjectCategory(fighters: readonly Fighter[], ensemble: boolean): ProjectCategory {
+  const count = fighters.filter(({ firstName, lastName, licenseNumber, captain }) =>
+    captain || [firstName, lastName, licenseNumber].some((value) => value.trim().length > 0)).length;
+  if (count < 2) return 'Kata';
+  if (count === 2) return 'Duel';
+  return ensemble ? 'Ensemble' : 'Bataille';
+}
+
 export type Assistant = {
   id: string;
   firstName: string;

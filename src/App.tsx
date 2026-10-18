@@ -5,6 +5,7 @@ import GuidedTour from './components/GuidedTour';
 import RepresentationView from './components/RepresentationView';
 import {
   createLineId,
+  calculateProjectCategory,
   calculateOppositionDuration,
   defaultDraft,
   formatProject,
@@ -114,11 +115,7 @@ export default function App() {
   const fighterSuggestions = useMemo(() => draft.fighters.map((fighter) => fighter.name).filter(Boolean), [draft.fighters]);
   const handSuggestions = useMemo(() => movementList.filter((movement) => movement.categorie === 'main' || movement.categorie === 'combine').map((movement) => movement.nom), []);
   const footSuggestions = useMemo(() => movementList.filter((movement) => movement.categorie === 'pieds').map((movement) => movement.nom), []);
-  const projectCategory = draft.fighters.length === 0
-    ? 'Non définie'
-    : draft.fighters.length === 1 ? 'Kata'
-      : draft.fighters.length === 2 ? 'Duel'
-        : draft.info.ensemble ? 'Ensemble' : 'Bataille';
+  const projectCategory = calculateProjectCategory(draft.fighters, draft.info.ensemble);
 
   useEffect(() => {
     if (!hasEdited.current) return;
