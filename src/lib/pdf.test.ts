@@ -34,4 +34,21 @@ describe('PDF export', () => {
     expect(JSON.stringify(createPdf.mock.calls[0][0])).toContain('(cible : Zone 2)');
     expect(JSON.stringify(createPdf.mock.calls[0][0])).toContain('Riposte Marche');
   });
+
+  it('includes choreographic time descriptions and keeps the fallback when empty', async () => {
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:project-pdf'), revokeObjectURL: vi.fn() });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const createPdf = vi.spyOn(pdfMake, 'createPdf').mockReturnValue({ getBlob: async () => new Blob() } as never);
+    const project = defaultDraft();
+    project.sections.push(
+      { type: 'temps', id: 'time', end: 4, description: 'Une entrée en scène\npuis un salut.' },
+      { type: 'temps', id: 'empty-time', end: 5, description: '' },
+    );
+
+    await downloadProjectPdf(project, 'A4-landscape');
+
+    const pdfContent = JSON.stringify(createPdf.mock.calls[0][0]);
+    expect(pdfContent).toContain('Une entrée en scène\\npuis un salut.');
+    expect(pdfContent).toContain('Temps chorégraphique sans action de combat.');
+  });
 });

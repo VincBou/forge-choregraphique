@@ -47,4 +47,16 @@ describe('RepresentationView', () => {
     expect(screen.getByRole('timer')).toHaveTextContent('00:00.0');
     expect(screen.getByRole('button', { name: 'Lancer' })).toBeInTheDocument();
   });
+
+  it('shows choreographic time descriptions in read-only representation', () => {
+    const project = defaultDraft();
+    const phrase = project.sections[0];
+    if (phrase.type !== 'phrase') throw new Error('Default phrase missing');
+    phrase.end = 2;
+    project.sections = [phrase, { type: 'temps', id: 'time', end: 5, description: 'Un passage\navec déplacement.' }];
+    render(<RepresentationView project={project} initialElapsedMs={0} onBack={() => undefined} />);
+
+    expect(screen.getByText(/Un passage/).textContent).toBe('Un passage\navec déplacement.');
+    expect(screen.queryByText('Temps sans action de combat')).not.toBeInTheDocument();
+  });
 });

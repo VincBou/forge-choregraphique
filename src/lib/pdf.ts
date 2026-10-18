@@ -87,7 +87,7 @@ export async function downloadProjectPdf(draft: ProjectDraft, selectedFormat: st
       { columns: [{ text: `${formatTime(start)} · Début`, style: 'body' }, { text: `${formatTime(section.end)} · Fin`, alignment: 'right', style: 'body' }], margin: [0, 0, 0, 10] },
     );
     if (section.type === 'temps') {
-      content.push({ text: 'Temps chorégraphique sans action de combat.', style: 'body', italics: true });
+      content.push({ text: section.description.trim() ? section.description : 'Temps chorégraphique sans action de combat.', style: 'body', italics: !section.description.trim() });
       start = section.end;
       continue;
     }

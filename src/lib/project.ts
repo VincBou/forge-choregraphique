@@ -1,4 +1,5 @@
-export const STORAGE_KEY = 'forgechoree.project.v8';
+export const STORAGE_KEY = 'forgechoree.project.v9';
+export const V8_STORAGE_KEY = 'forgechoree.project.v8';
 export const V7_STORAGE_KEY = 'forgechoree.project.v7';
 export const V6_STORAGE_KEY = 'forgechoree.project.v6';
 export const V5_STORAGE_KEY = 'forgechoree.project.v5';
@@ -64,7 +65,7 @@ export type PhraseDArmes = {
   lines: ChoreographyLine[];
 };
 
-export type TempsChoregraphique = { type: 'temps'; id: string; end: number };
+export type TempsChoregraphique = { type: 'temps'; id: string; end: number; description: string };
 export type ChoreographySection = PhraseDArmes | TempsChoregraphique;
 
 export type ProjectDraft = {
@@ -76,7 +77,7 @@ export type ProjectDraft = {
 
 export type ProjectFile = {
   format: 'forge-choregraphique';
-  version: 4;
+  version: 5;
   project: ProjectDraft;
 };
 
@@ -216,7 +217,7 @@ function isValidSection(value: unknown, ids: Set<string>, lineCount: { value: nu
   const section = value as ChoreographySection;
   if (typeof section.end !== 'number' || !Number.isFinite(section.end) || section.end < previousEnd.value || !isValidId(section.id, ids)) return false;
   previousEnd.value = section.end;
-  if (section.type === 'temps') return true;
+  if (section.type === 'temps') return isValidMultiline(section.description, MAX_PROJECT_INFO_LENGTH);
   if (section.type !== 'phrase' || !Array.isArray(section.lines)) return false;
   lineCount.value += section.lines.length;
   return lineCount.value <= MAX_LINES && section.lines.every((line) => isValidChoreographyLine(line, ids));
@@ -258,7 +259,7 @@ function sanitizeProjectDraft(value: unknown, rejectUnknown = true, allowMissing
         && section.lines.every((line) => hasExactKeys(line, allowMissingTargets
           ? ['id', 'attacker', 'handMovement', 'footMovement', 'details', 'defender', 'defenderHandMovement', 'defenderFootMovement', 'defenderDetails']
           : ['id', 'attacker', 'handMovement', 'footMovement', 'target', 'details', 'defender', 'defenderHandMovement', 'defenderFootMovement', 'defenderTarget', 'defenderDetails']))
-      : hasExactKeys(section, ['type', 'id', 'end']) && section.type === 'temps');
+      : hasExactKeys(section, ['type', 'id', 'end', 'description']) && section.type === 'temps');
   if (rejectUnknown && !exactShape) return null;
 
   return {
@@ -266,11 +267,22 @@ function sanitizeProjectDraft(value: unknown, rejectUnknown = true, allowMissing
     fighters: draft.fighters.map(({ id, name, firstName, lastName, licenseNumber, captain }) => ({ id, name, firstName, lastName, licenseNumber, captain })),
     assistants: draft.assistants.map(({ id, firstName, lastName, licenseNumber, role }) => ({ id, firstName, lastName, licenseNumber, role })),
     sections: draft.sections.map((section) => section.type === 'temps'
-      ? { type: 'temps', id: section.id, end: section.end }
+      ? { type: 'temps', id: section.id, end: section.end, description: section.description }
       : { type: 'phrase', id: section.id, end: section.end, lines: section.lines.map(({ id, attacker, handMovement, footMovement, target, details, defender, defenderHandMovement, defenderFootMovement, defenderTarget, defenderDetails }) => ({
         id, attacker, handMovement, footMovement, target: target ?? '', details, defender, defenderHandMovement, defenderFootMovement, defenderTarget: defenderTarget ?? '', defenderDetails,
       })) }),
   };
+}
+
+function migrateMissingTimeDescriptions(value: unknown): ProjectDraft | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const draft = value as ProjectDraft;
+  if (!Array.isArray(draft.sections)) return null;
+  const sections = draft.sections.map((section) => section && typeof section === 'object' && !Array.isArray(section)
+    && (section as ChoreographySection).type === 'temps' && !Object.hasOwn(section, 'description')
+    ? { ...section, description: '' }
+    : section);
+  return sanitizeProjectDraft({ ...draft, sections });
 }
 
 function mapLegacyReactionLine(line: Record<string, unknown>, movementCategories: ReadonlyMap<string, MovementCategory>, hasLegacyReaction = true) {
@@ -299,7 +311,9 @@ function migrateLegacyReactionDraft(value: unknown, movementCategories: Readonly
       ? { ...section, lines: section.lines.map((line) => line && typeof line === 'object' && !Array.isArray(line)
         ? mapLegacyReactionLine(line as unknown as Record<string, unknown>, movementCategories, hasLegacyReaction)
         : line) }
-      : section),
+      : section && typeof section === 'object' && (section as ChoreographySection).type === 'temps' && !Object.hasOwn(section, 'description')
+        ? { ...section, description: '' }
+        : section),
   };
   return sanitizeProjectDraft(converted, true, allowMissingTargets);
 }
@@ -328,7 +342,7 @@ function sanitizeV5Draft(value: unknown): V5Draft | null {
 export function createProjectFile(project: ProjectDraft): ProjectFile {
   const safeProject = sanitizeProjectDraft(project, false);
   if (!safeProject) throw new TypeError('Invalid project draft');
-  return { format: 'forge-choregraphique', version: 4, project: safeProject };
+  return { format: 'forge-choregraphique', version: 5, project: safeProject };
 }
 
 export function parseProjectFile(json: string, movementCategories: ReadonlyMap<string, MovementCategory> = new Map()): ProjectDraft | null {
@@ -336,8 +350,9 @@ export function parseProjectFile(json: string, movementCategories: ReadonlyMap<s
   try {
     const value: unknown = JSON.parse(json.charCodeAt(0) === 0xfeff ? json.slice(1) : json);
     if (!hasExactKeys(value, ['format', 'version', 'project'])
-      || value.format !== 'forge-choregraphique' || ![1, 2, 3, 4].includes(value.version as number)) return null;
-    if (value.version === 4) return sanitizeProjectDraft(value.project);
+      || value.format !== 'forge-choregraphique' || ![1, 2, 3, 4, 5].includes(value.version as number)) return null;
+    if (value.version === 5) return sanitizeProjectDraft(value.project);
+    if (value.version === 4) return migrateMissingTimeDescriptions(value.project);
     if (value.version === 3) return migrateLegacyReactionDraft(value.project, movementCategories);
     if (value.version === 2) return migrateLegacyReactionDraft(value.project, movementCategories, true, false);
     const legacy = sanitizeV5Draft(value.project);
@@ -459,6 +474,15 @@ export function loadDraft(storage?: DraftStorage, movementCategories: ReadonlyMa
       } catch { currentInvalid = true; }
     }
 
+    const v8Raw = target.getItem(V8_STORAGE_KEY);
+    if (v8Raw !== null) {
+      try {
+        const v8: unknown = JSON.parse(v8Raw);
+        const migrated = migrateMissingTimeDescriptions(v8);
+        if (migrated) return saveMigratedDraft(target, V8_STORAGE_KEY, migrated);
+      } catch { /* Try older draft formats. */ }
+    }
+
     const v7Raw = target.getItem(V7_STORAGE_KEY);
     if (v7Raw !== null) {
       try {
@@ -517,7 +541,7 @@ export function loadDraft(storage?: DraftStorage, movementCategories: ReadonlyMa
       } catch { /* Show the invalid-draft warning below. */ }
     }
 
-    if (currentInvalid || v7Raw !== null || v6Raw !== null || v5Raw !== null || v4Raw !== null || v3Raw !== null || v2Raw !== null || legacyRaw !== null) {
+    if (currentInvalid || v8Raw !== null || v7Raw !== null || v6Raw !== null || v5Raw !== null || v4Raw !== null || v3Raw !== null || v2Raw !== null || legacyRaw !== null) {
       return { draft: defaultDraft(), warning: 'Le brouillon enregistré est invalide. Un nouveau projet a été ouvert.', migrated: false };
     }
     return { draft: defaultDraft(), warning: null, migrated: false };
@@ -590,6 +614,7 @@ export function formatProject(draft: ProjectDraft): string {
     if (section.type === 'temps') {
       const number = ++timeNumber;
       output.push(`${formatTime(start)} - Début Temps chorégraphique ${number}`);
+      if (section.description.trim()) output.push(section.description);
       output.push(`${formatTime(section.end)} - Fin Temps chorégraphique ${number}`);
       output.push('');
       start = section.end;

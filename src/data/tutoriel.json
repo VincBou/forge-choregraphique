@@ -32,7 +32,7 @@
   {
     "id": "times",
     "title": "Les temps chorégraphiques",
-    "text": "Ajoutez des temps dédiés aux passages chorégraphiques sans action. Ils possèdent un début et une fin, peuvent être déplacés dans la chronologie et ne comptent pas dans le calcul de la durée d’opposition."
+    "text": "Ajoutez des temps dédiés aux passages chorégraphiques sans action de combat. Décrivez librement les actions réalisées pendant l’intervalle ; ce texte apparaît dans la Vue Représentation et les exports. Les temps possèdent un début et une fin, peuvent être déplacés dans la chronologie et ne comptent pas dans le calcul de la durée d’opposition."
   },
   {
     "id": "lines",

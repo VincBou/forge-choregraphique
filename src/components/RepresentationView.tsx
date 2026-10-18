@@ -98,7 +98,7 @@ export default function RepresentationView({ project, initialElapsedMs, onBack }
           : `Temps chorégraphique ${project.sections.slice(0, sectionIndex + 1).filter((item) => item.type === 'temps').length}`;
         return <section className={`representation-section${activeSection ? ' is-active' : ''}`} id={`representation-section-${section.id}`} key={section.id}>
           <header className="representation-section-heading"><h2>{sectionName}</h2><span>{formatSectionTime(startAt)} – {formatSectionTime(section.end)}</span></header>
-          {section.type === 'temps' ? <p className={`representation-time-label${activeSection ? ' is-current' : ''}`}>Temps sans action de combat</p> : section.lines.map((line, lineIndex) => {
+          {section.type === 'temps' ? <p className={`representation-time-label${activeSection ? ' is-current' : ''}`}>{section.description.trim() ? section.description : 'Temps sans action de combat'}</p> : section.lines.map((line, lineIndex) => {
             const actionIndex = actionIndices.get(line.id);
             const distance = actionIndex !== undefined && focus?.lineId ? Math.abs(actionIndex - (actionIndices.get(focus.lineId) ?? actionIndex)) : 0;
             const emphasis = actionIndex !== undefined && focus?.lineId === line.id ? ' is-current' : distance === 1 ? ' is-neighbor-1' : distance === 2 ? ' is-neighbor-2' : '';

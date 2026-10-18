@@ -176,7 +176,7 @@ describe('App security and editor basics', () => {
     fireEvent.change(hand, { target: { value: 'Parade' } });
     fireEvent.blur(hand);
     expect(screen.queryByRole('combobox', { name: 'Cible, ligne 1.1' })).not.toBeInTheDocument();
-    expect(JSON.parse(window.localStorage.getItem('forgechoree.project.v8') ?? '{}').sections[0].lines[0].target).toBe('');
+    expect(JSON.parse(window.localStorage.getItem('forgechoree.project.v9') ?? '{}').sections[0].lines[0].target).toBe('');
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Défenseur facultatif, ligne 1.1' }), { target: { value: 'Combattant B' } });
     const reaction = screen.getByRole('combobox', { name: 'Mouvement de main du défenseur, ligne 1.1' });
@@ -226,6 +226,23 @@ describe('App security and editor basics', () => {
     expect(screen.getByRole('spinbutton', { name: 'Fin de Phrase d’armes 2' })).toHaveValue(20);
   });
 
+  it('saves a free choreographic time description and confirms its deletion even without duration', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter un Temps chorégraphique' }));
+    const description = screen.getByRole('textbox', { name: 'Description des actions chorégraphiques de Temps chorégraphique 1' });
+    fireEvent.change(description, { target: { value: 'Entrée en scène\nPuis salut.' } });
+
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem('forgechoree.project.v9') ?? '{}').sections[1].description).toBe('Entrée en scène\nPuis salut.'));
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer Temps chorégraphique 1' }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Sa description sera perdue.'));
+    expect(description).toBeInTheDocument();
+
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer Temps chorégraphique 1' }));
+    expect(screen.queryByRole('textbox', { name: 'Description des actions chorégraphiques de Temps chorégraphique 1' })).not.toBeInTheDocument();
+  });
+
   it('deletes a confirmed phrase, shifts later timings, renumbers lines and focuses the next phrase', () => {
     const { container } = render(<App />);
     vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -250,7 +267,7 @@ describe('App security and editor basics', () => {
     expect(screen.getByRole('spinbutton', { name: 'Fin de Phrase d’armes 2' })).toHaveValue(15);
     expect(within(screen.getByRole('region', { name: 'Phrase d’armes 2' })).getByText('10.0')).toBeInTheDocument();
     expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Phrase d’armes 2' }));
-    expect(JSON.parse(window.localStorage.getItem('forgechoree.project.v8') ?? '{}').sections.filter((section: { type: string }) => section.type === 'phrase').map((phrase: { end: number }) => phrase.end)).toEqual([10, 15]);
+    expect(JSON.parse(window.localStorage.getItem('forgechoree.project.v9') ?? '{}').sections.filter((section: { type: string }) => section.type === 'phrase').map((phrase: { end: number }) => phrase.end)).toEqual([10, 15]);
     expect(container.querySelectorAll('.phrase-group')).toHaveLength(2);
   });
 
@@ -278,7 +295,7 @@ describe('App security and editor basics', () => {
     expect(screen.getByRole('spinbutton', { name: 'Fin de Phrase d’armes 2' })).toHaveValue(5.5);
     const secondPhrase = screen.getByRole('region', { name: 'Phrase d’armes 2' });
     expect(within(secondPhrase).getByText('5.5')).toBeInTheDocument();
-    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v8') ?? '{}');
+    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v9') ?? '{}');
     expect(savedDraft.sections[0].end).toBe(5.5);
     expect(savedDraft.sections[1].end).toBe(5.5);
     fireEvent.click(screen.getByRole('button', { name: 'Calculer la durée d’opposition' }));
@@ -304,7 +321,7 @@ describe('App security and editor basics', () => {
     expect(attacker1).toHaveValue('Alice');
     expect(defender1).toHaveValue('Alice');
     expect(screen.getByRole('combobox', { name: 'Attaquant, ligne 1.2' })).toHaveValue('Combattant A bis');
-    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v8') ?? '{}');
+    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v9') ?? '{}');
     expect(savedDraft.fighters[0].name).toBe('Alice');
     expect(savedDraft.sections[0].lines[0].attacker).toBe('Alice');
     expect(savedDraft.sections[0].lines[0].defender).toBe('Alice');
@@ -356,7 +373,7 @@ describe('App security and editor basics', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Prénom de l’assistant 1' }), { target: { value: 'Sam' } });
     fireEvent.change(screen.getByRole('textbox', { name: 'Rôle de l’assistant 1' }), { target: { value: 'Figurant' } });
 
-    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v8') ?? '{}');
+    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v9') ?? '{}');
     expect(savedDraft.info).toMatchObject({ title: 'Le duel', notes: 'Une intrigue\nUne musique', ensemble: true });
     expect(savedDraft.assistants[0]).toMatchObject({ firstName: 'Sam', role: 'Figurant' });
   });
@@ -422,6 +439,7 @@ describe('App security and editor basics', () => {
     expect(window.localStorage.getItem('forgechoree.project.v4')).toBeNull();
     expect(window.localStorage.getItem('forgechoree.project.v7')).toBeNull();
     expect(window.localStorage.getItem('forgechoree.project.v8')).toBeNull();
+    expect(window.localStorage.getItem('forgechoree.project.v9')).toBeNull();
     expect(screen.getByText(/brouillon local a été effacé/i)).toHaveAttribute('role', 'status');
   });
 });

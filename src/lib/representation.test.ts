@@ -22,7 +22,7 @@ describe('representation timeline', () => {
     if (phrase.type !== 'phrase') throw new Error('Default phrase missing');
     project.sections = [
       { ...phrase, end: 10, lines: [line('one'), { ...line('blank'), attacker: '', handMovement: '' }, line('two')] },
-      { type: 'temps', id: 'pause', end: 20 },
+      { type: 'temps', id: 'pause', end: 20, description: '' },
       { type: 'phrase', id: 'last', end: 30, lines: [line('last-line')] },
     ];
     expect(getRepresentationFocus(project, 0)).toMatchObject({ sectionId: phrase.id, sectionNumber: 1, lineId: 'one', lineNumber: 1 });

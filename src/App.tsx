@@ -25,6 +25,7 @@ import {
   normalizeMultiLine,
   normalizeSingleLine,
   STORAGE_KEY,
+  V8_STORAGE_KEY,
   V4_STORAGE_KEY,
   V6_STORAGE_KEY,
   V5_STORAGE_KEY,
@@ -262,7 +263,7 @@ export default function App() {
 
   function addChoreographicTime() {
     const end = draft.sections.at(-1)?.end ?? 0;
-    changeDraft({ ...draft, sections: [...draft.sections, { type: 'temps', id: createLineId(), end }] });
+    changeDraft({ ...draft, sections: [...draft.sections, { type: 'temps', id: createLineId(), end, description: '' }] });
     setExportError(null);
   }
 
@@ -272,7 +273,7 @@ export default function App() {
     const section = draft.sections[index];
     if (section.type !== 'temps') return;
     const duration = section.end - sectionStart(draft.sections, index);
-    if (duration > 0 && !window.confirm(`Supprimer Temps chorégraphique ${draft.sections.slice(0, index + 1).filter((item) => item.type === 'temps').length} ? Les sections suivantes avanceront pour préserver leur durée.`)) return;
+    if ((duration > 0 || section.description.trim()) && !window.confirm(`Supprimer Temps chorégraphique ${draft.sections.slice(0, index + 1).filter((item) => item.type === 'temps').length} ?${section.description.trim() ? ' Sa description sera perdue.' : ''}${duration > 0 ? ' Les sections suivantes avanceront pour préserver leur durée.' : ''}`)) return;
     const sections = draft.sections.filter((candidate) => candidate.id !== id);
     for (let next = index; next < sections.length; next += 1) sections[next] = { ...sections[next], end: Math.max(next ? sections[next - 1].end : 0, sections[next].end - duration) };
     const shiftedIds = new Set(draft.sections.slice(index).map((candidate) => candidate.id));
@@ -450,6 +451,7 @@ export default function App() {
     let cleared = false;
     try {
       window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(V8_STORAGE_KEY);
       window.localStorage.removeItem(V7_STORAGE_KEY);
       window.localStorage.removeItem(V6_STORAGE_KEY);
       window.localStorage.removeItem(V5_STORAGE_KEY);
@@ -713,7 +715,10 @@ export default function App() {
                     <label className="phrase-timing" htmlFor={`time-end-${section.id}`}><span>Fin</span><input id={`time-end-${section.id}`} aria-label={`Fin de ${timeName}`} type="number" min={start} step="0.1" value={timingEdits[section.id] ?? formatTiming(section.end)} onFocus={() => setTimingEdits((edits) => ({ ...edits, [section.id]: formatTiming(section.end) }))} onChange={(event) => { const value = event.target.value; setTimingEdits((edits) => ({ ...edits, [section.id]: value })); commitSectionEnd(sectionIndex, value, false); }} onBlur={() => commitSectionEnd(sectionIndex)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); commitSectionEnd(sectionIndex); } if (event.key === 'Escape') setTimingEdits(({ [section.id]: _discarded, ...edits }) => edits); }} /></label>
                     <div className="section-order"><button className="icon-button" type="button" aria-label={`Monter ${timeName}`} disabled={sectionIndex === 0} onClick={() => moveSection(section.id, -1)}>↑</button><button className="icon-button" type="button" aria-label={`Descendre ${timeName}`} disabled={sectionIndex === draft.sections.length - 1} onClick={() => moveSection(section.id, 1)}>↓</button></div>
                     <button className="text-button delete-phrase" type="button" aria-label={`Supprimer ${timeName}`} onClick={() => removeChoreographicTime(section.id)}>Supprimer</button></div>
-                  <div className="time-placeholder">Ce temps ne contient pas de ligne d’action et ne compte pas dans le temps de combat.</div>
+                  <textarea className="time-description" aria-label={`Description des actions chorégraphiques de ${timeName}`} placeholder="Décrivez les actions réalisées pendant cet intervalle…" maxLength={MAX_PROJECT_INFO_LENGTH} rows={4} value={section.description} onChange={(event) => {
+                    const description = normalizeMultiLine(event.target.value, MAX_PROJECT_INFO_LENGTH);
+                    changeDraft({ ...draft, sections: draft.sections.map((candidate) => candidate.id === section.id && candidate.type === 'temps' ? { ...candidate, description } : candidate) });
+                  }} />
                 </section>;
               }
               const phrase = section;

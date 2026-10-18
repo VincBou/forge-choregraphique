@@ -22,7 +22,7 @@
 body { min-width: 320px; min-height: 100vh; margin: 0; background: radial-gradient(ellipse at 52% -35%, #293148 0, transparent 48%), var(--bg); }
 button, input, textarea { font: inherit; }
 button { color: inherit; }
-button:focus-visible, input:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; }
 .app-shell { width: min(1440px, 100%); min-height: 100vh; padding: 0 44px; margin: 0 auto; }
 .topbar { min-height: 106px; display: flex; align-items: center; border-bottom: 1px solid #ffffff12; gap: 14px; }
 .brand-mark { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid #e9ad5666; border-radius: 12px; color: var(--accent-bright); background: #e9ad5610; font-size: 24px; }
@@ -123,7 +123,8 @@ h1 { margin-bottom: 0; font: 600 19px Arial, sans-serif; letter-spacing: -.03em;
 .section-order { display: flex; justify-content: flex-end; gap: 3px; }
 .time-group .phrase-rail { border-color: #82a8fc30; background: linear-gradient(160deg, #82a8fc0d, #ffffff03); }
 .time-group .phrase-rail h3 { color: #a9c2ff; }
-.time-placeholder { display: flex; align-items: center; padding: 16px; border: 1px dashed #82a8fc2a; border-radius: 9px; color: #8993a4; font-size: 11px; }
+.time-description { width: 100%; min-width: 0; min-height: 88px; padding: 12px 14px; border: 1px dashed #82a8fc2a; border-radius: 9px; color: #c5cedf; background: #10131a55; font-size: 12px; line-height: 1.55; resize: vertical; }
+.time-description::placeholder { color: #8993a4; }
 .delete-phrase { margin-top: auto; color: var(--danger); }
 .delete-phrase:hover { color: #ffabb3; }
 .delete-phrase:disabled { opacity: .4; cursor: not-allowed; }
@@ -220,7 +221,7 @@ kbd { padding: 2px 5px; margin-right: 5px; border: 1px solid #ffffff1a; border-r
 .representation-line.is-neighbor-1 { font-size: 20px; }
 .representation-line.is-neighbor-2 { font-size: 18px; }
 .representation-line.is-current { color: #fff4df; background: #e9ad5615; font-size: 26px; font-weight: 700; }
-.representation-time-label { margin: 12px 0 4px; color: #8faef8; font-size: 16px; transition: font-size .3s ease, font-weight .3s ease; }
+.representation-time-label { margin: 12px 0 4px; color: #8faef8; font-size: 16px; line-height: 1.5; white-space: pre-wrap; transition: font-size .3s ease, font-weight .3s ease; }
 .representation-time-label.is-current { font-size: 25px; font-weight: 700; }
 @media (prefers-reduced-motion: reduce) {
   .representation-clock, .clock-readout, .representation-section-heading h2, .representation-line, .representation-time-label { transition: none; }

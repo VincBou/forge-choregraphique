@@ -16,6 +16,7 @@ import {
   OLDER_STORAGE_KEY,
   PREVIOUS_STORAGE_KEY,
   STORAGE_KEY,
+  V8_STORAGE_KEY,
   V7_STORAGE_KEY,
   V4_STORAGE_KEY,
   V5_STORAGE_KEY,
@@ -49,7 +50,7 @@ describe('project formatting and validation', () => {
     const draft = defaultDraft();
     draft.fighters[0].name = '<img src=x onerror=alert(1)>';
     const json = JSON.stringify(createProjectFile(draft));
-    expect(JSON.parse(json).version).toBe(4);
+    expect(JSON.parse(json).version).toBe(5);
     expect(parseProjectFile(json)).toEqual(draft);
 
     const withUnknownField = JSON.parse(json);
@@ -57,7 +58,7 @@ describe('project formatting and validation', () => {
     expect(parseProjectFile(JSON.stringify(withUnknownField))).toBeNull();
 
     const unknownVersion = JSON.parse(json);
-    unknownVersion.version = 5;
+    unknownVersion.version = 6;
     expect(parseProjectFile(JSON.stringify(unknownVersion))).toBeNull();
     expect(parseProjectFile(`${json}${' '.repeat(10 * 1024 * 1024)}`)).toBeNull();
 
@@ -77,7 +78,7 @@ describe('project formatting and validation', () => {
     expect(migrated?.sections[0]).toMatchObject({ type: 'phrase', id: draft.sections[0].id });
     expect(migrated?.sections[0]).toMatchObject({ lines: [{ target: '', defenderTarget: '' }] });
 
-    const invalid = createProjectFile({ ...draft, sections: [...draft.sections, { type: 'temps', id: 'time', end: 1 }] });
+    const invalid = createProjectFile({ ...draft, sections: [...draft.sections, { type: 'temps', id: 'time', end: 1, description: '' }] });
     const tampered = JSON.parse(JSON.stringify(invalid));
     tampered.project.sections[1].lines = [];
     expect(parseProjectFile(JSON.stringify(tampered))).toBeNull();
@@ -91,6 +92,17 @@ describe('project formatting and validation', () => {
     const oldDraft = { ...draft, sections: [{ ...phrase, lines: [{ ...legacyLine, defenderMovement: 'Marche' }] }] };
     const imported = parseProjectFile(JSON.stringify({ format: 'forge-choregraphique', version: 3, project: oldDraft }), new Map([['marche', 'pieds']]));
     expect(phrases(imported!)[0].lines[0]).toMatchObject({ defenderHandMovement: '', defenderFootMovement: 'Marche' });
+  });
+
+  it('adds an empty description when importing version 4 JSON choreographic times', () => {
+    const draft = defaultDraft();
+    const oldFile = createProjectFile({ ...draft, sections: [...draft.sections, { type: 'temps', id: 'time-v4', end: 4, description: '' }] }) as unknown as { version: number; project: ProjectDraft };
+    oldFile.version = 4;
+    const time = oldFile.project.sections[1];
+    if (time.type !== 'temps') throw new Error('Choreographic time missing');
+    const { description: _description, ...legacyTime } = time;
+    oldFile.project.sections[1] = legacyTime as typeof time;
+    expect(parseProjectFile(JSON.stringify({ format: 'forge-choregraphique', version: 4, project: oldFile.project }))?.sections[1]).toEqual({ ...legacyTime, description: '' });
   });
 
   it('ignores empty lines and numbers exported actions within each phrase', () => {
@@ -112,17 +124,19 @@ describe('project formatting and validation', () => {
     if (phrase.type !== 'phrase') throw new Error('Default phrase missing');
     draft.sections = [
       { ...phrase, end: 10, lines: [line()] },
-      { type: 'temps', id: 'time-1', end: 15 },
+      { type: 'temps', id: 'time-1', end: 15, description: 'Un passage\navec déplacement.' },
       { type: 'phrase', id: 'phrase-2', end: 20, lines: [line({ id: 'line-2' })] },
     ];
     expect(calculateOppositionDuration(draft)).toBe('00m:15s');
-    expect(formatProject(draft)).toContain('10.0 - Début Temps chorégraphique 1\n15.0 - Fin Temps chorégraphique 1');
+    expect(formatProject(draft)).toContain('10.0 - Début Temps chorégraphique 1');
+    expect(formatProject(draft)).toContain('15.0 - Fin Temps chorégraphique 1');
+    expect(formatProject(draft)).toContain('10.0 - Début Temps chorégraphique 1\nUn passage\navec déplacement.\n15.0 - Fin Temps chorégraphique 1');
     expect(formatProject(draft)).toContain('15.0 - Début Phrase 2\n2.1 - Combattant A Parade');
   });
 
   it('allows exporting a project containing only a choreographic time', () => {
     const draft = defaultDraft();
-    draft.sections = [{ type: 'phrase', id: 'p', end: 0, lines: [] }, { type: 'temps', id: 't', end: 3 }];
+    draft.sections = [{ type: 'phrase', id: 'p', end: 0, lines: [] }, { type: 'temps', id: 't', end: 3, description: '' }];
     expect(getExportError(draft)).toBeNull();
     expect(formatProject(draft)).toContain('0.0 - Début Temps chorégraphique 1');
   });
@@ -205,6 +219,23 @@ describe('project formatting and validation', () => {
     const loaded = loadDraft({ getItem: (key) => key === STORAGE_KEY ? JSON.stringify(saved) : null, setItem: () => undefined, removeItem: () => undefined });
     expect(loaded.draft).toEqual(saved);
     expect(loaded.warning).toBeNull();
+  });
+
+  it('migrates v8 local choreographic times to descriptions in v9', () => {
+    const current = defaultDraft();
+    const phrase = current.sections[0];
+    if (phrase.type !== 'phrase') throw new Error('Default phrase missing');
+    const oldDraft = { ...current, sections: [phrase, { type: 'temps' as const, id: 'time-v8', end: 4 }] };
+    const values = new Map([[V8_STORAGE_KEY, JSON.stringify(oldDraft)]]);
+    const loaded = loadDraft({
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => { values.set(key, value); },
+      removeItem: (key) => { values.delete(key); },
+    });
+    expect(loaded.migrated).toBe(true);
+    expect(loaded.draft.sections[1]).toEqual({ type: 'temps', id: 'time-v8', end: 4, description: '' });
+    expect(values.has(STORAGE_KEY)).toBe(true);
+    expect(values.has(V8_STORAGE_KEY)).toBe(false);
   });
 
   it('migrates known legacy movements by category and keeps unknown actions in the hand field', () => {
