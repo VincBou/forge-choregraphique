@@ -1,4 +1,5 @@
-export const STORAGE_KEY = 'forgechoree.project.v7';
+export const STORAGE_KEY = 'forgechoree.project.v8';
+export const V7_STORAGE_KEY = 'forgechoree.project.v7';
 export const V6_STORAGE_KEY = 'forgechoree.project.v6';
 export const V5_STORAGE_KEY = 'forgechoree.project.v5';
 export const PREVIOUS_STORAGE_KEY = 'forgechoree.project.v3';
@@ -50,7 +51,8 @@ export type ChoreographyLine = {
   target: string;
   details: string;
   defender: string;
-  defenderMovement: string;
+  defenderHandMovement: string;
+  defenderFootMovement: string;
   defenderTarget: string;
   defenderDetails: string;
 };
@@ -74,15 +76,19 @@ export type ProjectDraft = {
 
 export type ProjectFile = {
   format: 'forge-choregraphique';
-  version: 3;
+  version: 4;
   project: ProjectDraft;
 };
 
 type LegacyLine = { id: string; attacker: string; action: string; details: string; defender: string };
-type LegacyPhrase = Omit<PhraseDArmes, 'type'>;
-type V5Draft = { info: ProjectInfo; fighters: Fighter[]; assistants: Assistant[]; phrases: LegacyPhrase[] };
-type V2Line = Omit<ChoreographyLine, 'defenderMovement' | 'defenderDetails'>;
-type V3Draft = { fighters: string[]; lines: ChoreographyLine[] };
+type LegacyReactionLine = Omit<ChoreographyLine, 'defenderHandMovement' | 'defenderFootMovement'> & { defenderMovement: string };
+type LegacyPhrase = Omit<PhraseDArmes, 'type' | 'lines'> & { lines: LegacyReactionLine[] };
+type LegacyV4Line = Omit<LegacyReactionLine, 'target' | 'defenderTarget'>;
+type LegacyV4Phrase = Omit<PhraseDArmes, 'type' | 'lines'> & { lines: LegacyV4Line[] };
+type V5Draft = { info: ProjectInfo; fighters: Fighter[]; assistants: Assistant[]; phrases: LegacyV4Phrase[] };
+type V4Draft = { fighters: string[]; phrases: LegacyV4Phrase[] };
+type V3Draft = { fighters: string[]; lines: LegacyReactionLine[] };
+type V2Line = Omit<ChoreographyLine, 'defenderHandMovement' | 'defenderFootMovement' | 'target' | 'defenderTarget'>;
 type V2Draft = { fighters: string[]; lines: V2Line[] };
 type LegacyDraft = { fighters: string[]; lines: LegacyLine[] };
 type DraftStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
@@ -93,7 +99,7 @@ export const createLineId = (): string => typeof crypto !== 'undefined' && 'rand
 
 const createFighter = (name: string): Fighter => ({ id: createLineId(), name, firstName: '', lastName: '', licenseNumber: '', captain: false });
 const createEmptyProjectInfo = (): ProjectInfo => ({ title: '', club: '', duration: '00m:00s', oppositionDuration: '00m:00s', notes: '', ensemble: false });
-const createEmptyLine = (): ChoreographyLine => ({ id: createLineId(), attacker: '', handMovement: '', footMovement: '', target: '', details: '', defender: '', defenderMovement: '', defenderTarget: '', defenderDetails: '' });
+const createEmptyLine = (): ChoreographyLine => ({ id: createLineId(), attacker: '', handMovement: '', footMovement: '', target: '', details: '', defender: '', defenderHandMovement: '', defenderFootMovement: '', defenderTarget: '', defenderDetails: '' });
 
 export const defaultDraft = (): ProjectDraft => ({
   info: createEmptyProjectInfo(),
@@ -174,8 +180,24 @@ function isValidChoreographyLine(value: unknown, ids: Set<string>): value is Cho
     && (line.target === undefined || isValidText(line.target, MAX_NAME_LENGTH))
     && isValidText(line.defender, MAX_NAME_LENGTH)
     && isValidText(line.details, MAX_DETAILS_LENGTH)
-    && isValidText(line.defenderMovement, MAX_NAME_LENGTH)
+    && isValidText(line.defenderHandMovement, MAX_NAME_LENGTH)
+    && isValidText(line.defenderFootMovement, MAX_NAME_LENGTH)
     && (line.defenderTarget === undefined || isValidText(line.defenderTarget, MAX_NAME_LENGTH))
+    && isValidText(line.defenderDetails, MAX_DETAILS_LENGTH);
+}
+
+function isValidLegacyReactionLine(value: unknown, ids: Set<string>, allowMissingTargets = false): value is LegacyReactionLine {
+  if (!value || typeof value !== 'object') return false;
+  const line = value as LegacyReactionLine;
+  return isValidId(line.id, ids)
+    && isValidText(line.attacker, MAX_NAME_LENGTH)
+    && isValidText(line.handMovement, MAX_NAME_LENGTH)
+    && isValidText(line.footMovement, MAX_NAME_LENGTH)
+    && (allowMissingTargets || (line.target !== undefined && isValidText(line.target, MAX_NAME_LENGTH)))
+    && isValidText(line.defender, MAX_NAME_LENGTH)
+    && isValidText(line.details, MAX_DETAILS_LENGTH)
+    && isValidText(line.defenderMovement, MAX_NAME_LENGTH)
+    && (allowMissingTargets || (line.defenderTarget !== undefined && isValidText(line.defenderTarget, MAX_NAME_LENGTH)))
     && isValidText(line.defenderDetails, MAX_DETAILS_LENGTH);
 }
 
@@ -186,7 +208,7 @@ function isValidLegacyPhrase(value: unknown, ids: Set<string>, lineCount: { valu
     || phrase.end < previousEnd.value || !Array.isArray(phrase.lines)) return false;
   previousEnd.value = phrase.end;
   lineCount.value += phrase.lines.length;
-  return lineCount.value <= MAX_LINES && phrase.lines.every((line) => isValidChoreographyLine(line, ids));
+  return lineCount.value <= MAX_LINES && phrase.lines.every((line) => isValidLegacyReactionLine(line, ids, true));
 }
 
 function isValidSection(value: unknown, ids: Set<string>, lineCount: { value: number }, previousEnd: { value: number }): value is ChoreographySection {
@@ -234,8 +256,8 @@ function sanitizeProjectDraft(value: unknown, rejectUnknown = true, allowMissing
     && draft.sections.every((section) => section.type === 'phrase'
       ? hasExactKeys(section, ['type', 'id', 'end', 'lines'])
         && section.lines.every((line) => hasExactKeys(line, allowMissingTargets
-          ? ['id', 'attacker', 'handMovement', 'footMovement', 'details', 'defender', 'defenderMovement', 'defenderDetails']
-          : ['id', 'attacker', 'handMovement', 'footMovement', 'target', 'details', 'defender', 'defenderMovement', 'defenderTarget', 'defenderDetails']))
+          ? ['id', 'attacker', 'handMovement', 'footMovement', 'details', 'defender', 'defenderHandMovement', 'defenderFootMovement', 'defenderDetails']
+          : ['id', 'attacker', 'handMovement', 'footMovement', 'target', 'details', 'defender', 'defenderHandMovement', 'defenderFootMovement', 'defenderTarget', 'defenderDetails']))
       : hasExactKeys(section, ['type', 'id', 'end']) && section.type === 'temps');
   if (rejectUnknown && !exactShape) return null;
 
@@ -245,10 +267,41 @@ function sanitizeProjectDraft(value: unknown, rejectUnknown = true, allowMissing
     assistants: draft.assistants.map(({ id, firstName, lastName, licenseNumber, role }) => ({ id, firstName, lastName, licenseNumber, role })),
     sections: draft.sections.map((section) => section.type === 'temps'
       ? { type: 'temps', id: section.id, end: section.end }
-      : { type: 'phrase', id: section.id, end: section.end, lines: section.lines.map(({ id, attacker, handMovement, footMovement, target, details, defender, defenderMovement, defenderTarget, defenderDetails }) => ({
-        id, attacker, handMovement, footMovement, target: target ?? '', details, defender, defenderMovement, defenderTarget: defenderTarget ?? '', defenderDetails,
+      : { type: 'phrase', id: section.id, end: section.end, lines: section.lines.map(({ id, attacker, handMovement, footMovement, target, details, defender, defenderHandMovement, defenderFootMovement, defenderTarget, defenderDetails }) => ({
+        id, attacker, handMovement, footMovement, target: target ?? '', details, defender, defenderHandMovement, defenderFootMovement, defenderTarget: defenderTarget ?? '', defenderDetails,
       })) }),
   };
+}
+
+function mapLegacyReactionLine(line: Record<string, unknown>, movementCategories: ReadonlyMap<string, MovementCategory>, hasLegacyReaction = true) {
+  const { defenderMovement, ...fields } = line;
+  const category = hasLegacyReaction && typeof defenderMovement === 'string'
+    ? movementCategories.get(normalizeSearch(defenderMovement.trim())) ?? 'main'
+    : 'main';
+  return {
+    ...fields,
+    defenderHandMovement: hasLegacyReaction && category !== 'pieds' ? defenderMovement : '',
+    defenderFootMovement: hasLegacyReaction && category === 'pieds' ? defenderMovement : '',
+    ...(!hasLegacyReaction ? { defenderDetails: '' } : {}),
+  };
+}
+
+function splitLegacyReaction(line: LegacyReactionLine, movementCategories: ReadonlyMap<string, MovementCategory>): ChoreographyLine {
+  return mapLegacyReactionLine(line as unknown as Record<string, unknown>, movementCategories) as ChoreographyLine;
+}
+
+function migrateLegacyReactionDraft(value: unknown, movementCategories: ReadonlyMap<string, MovementCategory>, allowMissingTargets = false, hasLegacyReaction = true): ProjectDraft | null {
+  if (!value || typeof value !== 'object' || !Array.isArray((value as ProjectDraft).sections)) return null;
+  const draft = value as ProjectDraft;
+  const converted = {
+    ...draft,
+    sections: draft.sections.map((section) => section.type === 'phrase' && Array.isArray(section.lines)
+      ? { ...section, lines: section.lines.map((line) => line && typeof line === 'object' && !Array.isArray(line)
+        ? mapLegacyReactionLine(line as unknown as Record<string, unknown>, movementCategories, hasLegacyReaction)
+        : line) }
+      : section),
+  };
+  return sanitizeProjectDraft(converted, true, allowMissingTargets);
 }
 
 function sanitizeV5Draft(value: unknown): V5Draft | null {
@@ -275,25 +328,26 @@ function sanitizeV5Draft(value: unknown): V5Draft | null {
 export function createProjectFile(project: ProjectDraft): ProjectFile {
   const safeProject = sanitizeProjectDraft(project, false);
   if (!safeProject) throw new TypeError('Invalid project draft');
-  return { format: 'forge-choregraphique', version: 3, project: safeProject };
+  return { format: 'forge-choregraphique', version: 4, project: safeProject };
 }
 
-export function parseProjectFile(json: string): ProjectDraft | null {
+export function parseProjectFile(json: string, movementCategories: ReadonlyMap<string, MovementCategory> = new Map()): ProjectDraft | null {
   if (new TextEncoder().encode(json).byteLength > MAX_PROJECT_FILE_BYTES) return null;
   try {
     const value: unknown = JSON.parse(json.charCodeAt(0) === 0xfeff ? json.slice(1) : json);
     if (!hasExactKeys(value, ['format', 'version', 'project'])
-      || value.format !== 'forge-choregraphique' || ![1, 2, 3].includes(value.version as number)) return null;
-    if (value.version === 3) return sanitizeProjectDraft(value.project);
-    if (value.version === 2) return sanitizeProjectDraft(value.project, true, true);
+      || value.format !== 'forge-choregraphique' || ![1, 2, 3, 4].includes(value.version as number)) return null;
+    if (value.version === 4) return sanitizeProjectDraft(value.project);
+    if (value.version === 3) return migrateLegacyReactionDraft(value.project, movementCategories);
+    if (value.version === 2) return migrateLegacyReactionDraft(value.project, movementCategories, true, false);
     const legacy = sanitizeV5Draft(value.project);
-    return legacy ? migrateV5(legacy) : null;
+    return legacy ? migrateV5(legacy, movementCategories) : null;
   } catch {
     return null;
   }
 }
 
-function isV4Draft(value: unknown): value is { fighters: string[]; phrases: LegacyPhrase[] } {
+function isV4Draft(value: unknown): value is V4Draft {
   if (!value || typeof value !== 'object') return false;
   const draft = value as { fighters: unknown; phrases: unknown };
   if (!isValidLegacyFighters(draft.fighters) || !Array.isArray(draft.phrases) || draft.phrases.length === 0) return false;
@@ -308,7 +362,7 @@ function isV3Draft(value: unknown): value is V3Draft {
   const draft = value as { fighters: unknown; lines: unknown };
   if (!isValidLegacyFighters(draft.fighters) || !Array.isArray(draft.lines) || draft.lines.length > MAX_LINES) return false;
   const ids = new Set<string>();
-  return draft.lines.every((line) => isValidChoreographyLine(line, ids));
+  return draft.lines.every((line) => isValidLegacyReactionLine(line, ids));
 }
 
 function isV2Draft(value: unknown): value is V2Draft {
@@ -346,31 +400,31 @@ function wrapLinesInFirstPhrase(fighters: string[], lines: ChoreographyLine[]): 
 export function migrateLegacyDraft(legacy: LegacyDraft, movementCategories: ReadonlyMap<string, MovementCategory>): ProjectDraft {
   const lines = legacy.lines.map(({ action, ...line }) => {
     const category = movementCategories.get(normalizeSearch(action.trim())) ?? 'main';
-    return { ...line, handMovement: category === 'pieds' ? '' : action, footMovement: category === 'pieds' ? action : '', target: '', defenderMovement: '', defenderTarget: '', defenderDetails: '' };
+    return { ...line, handMovement: category === 'pieds' ? '' : action, footMovement: category === 'pieds' ? action : '', target: '', defenderHandMovement: '', defenderFootMovement: '', defenderTarget: '', defenderDetails: '' };
   });
   return wrapLinesInFirstPhrase(legacy.fighters, lines);
 }
 
 function migrateV2(draft: V2Draft): ProjectDraft {
-  return wrapLinesInFirstPhrase(draft.fighters, draft.lines.map((line) => ({ ...line, target: '', defenderMovement: '', defenderTarget: '', defenderDetails: '' })));
+  return wrapLinesInFirstPhrase(draft.fighters, draft.lines.map((line) => ({ ...line, target: '', defenderHandMovement: '', defenderFootMovement: '', defenderTarget: '', defenderDetails: '' })));
 }
 
-function migrateV3(draft: V3Draft): ProjectDraft {
-  return wrapLinesInFirstPhrase(draft.fighters, draft.lines.map((line) => ({ ...line, target: '', defenderTarget: '' })));
+function migrateV3(draft: V3Draft, movementCategories: ReadonlyMap<string, MovementCategory>): ProjectDraft {
+  return wrapLinesInFirstPhrase(draft.fighters, draft.lines.map((line) => ({ ...splitLegacyReaction(line, movementCategories), target: line.target ?? '', defenderTarget: line.defenderTarget ?? '' })));
 }
 
-function migrateV4(draft: { fighters: string[]; phrases: LegacyPhrase[] }): ProjectDraft {
+function migrateV4(draft: V4Draft, movementCategories: ReadonlyMap<string, MovementCategory>): ProjectDraft {
   const migrated = defaultDraft();
   return {
     ...migrated,
     fighters: draft.fighters.map(createFighter),
-    sections: draft.phrases.map((phrase) => ({ type: 'phrase', ...phrase, lines: phrase.lines.map((line) => ({ ...line, target: '', defenderTarget: '' })) })),
+    sections: draft.phrases.map((phrase) => ({ type: 'phrase', id: phrase.id, end: phrase.end, lines: phrase.lines.map((line) => ({ ...splitLegacyReaction(line as LegacyReactionLine, movementCategories), target: '', defenderTarget: '' })) })),
   };
 }
 
-function migrateV5(draft: V5Draft): ProjectDraft {
+function migrateV5(draft: V5Draft, movementCategories: ReadonlyMap<string, MovementCategory>): ProjectDraft {
   return { info: draft.info, fighters: draft.fighters, assistants: draft.assistants,
-    sections: draft.phrases.map((phrase) => ({ type: 'phrase', ...phrase, lines: phrase.lines.map((line) => ({ ...line, target: '', defenderTarget: '' })) })) };
+    sections: draft.phrases.map((phrase) => ({ type: 'phrase', id: phrase.id, end: phrase.end, lines: phrase.lines.map((line) => ({ ...splitLegacyReaction(line as LegacyReactionLine, movementCategories), target: '', defenderTarget: '' })) })) };
 }
 
 function isV5Draft(value: unknown): value is V5Draft {
@@ -405,11 +459,20 @@ export function loadDraft(storage?: DraftStorage, movementCategories: ReadonlyMa
       } catch { currentInvalid = true; }
     }
 
+    const v7Raw = target.getItem(V7_STORAGE_KEY);
+    if (v7Raw !== null) {
+      try {
+        const v7: unknown = JSON.parse(v7Raw);
+        const migrated = migrateLegacyReactionDraft(v7, movementCategories);
+        if (migrated) return saveMigratedDraft(target, V7_STORAGE_KEY, migrated);
+      } catch { /* Try older draft formats. */ }
+    }
+
     const v6Raw = target.getItem(V6_STORAGE_KEY);
     if (v6Raw !== null) {
       try {
         const v6: unknown = JSON.parse(v6Raw);
-        const migrated = sanitizeProjectDraft(v6, true, true);
+        const migrated = migrateLegacyReactionDraft(v6, movementCategories, true);
         if (migrated) return saveMigratedDraft(target, V6_STORAGE_KEY, migrated);
       } catch { /* Try older draft formats. */ }
     }
@@ -418,7 +481,7 @@ export function loadDraft(storage?: DraftStorage, movementCategories: ReadonlyMa
     if (v5Raw !== null) {
       try {
         const v5: unknown = JSON.parse(v5Raw);
-        if (isV5Draft(v5)) return saveMigratedDraft(target, V5_STORAGE_KEY, migrateV5(v5));
+        if (isV5Draft(v5)) return saveMigratedDraft(target, V5_STORAGE_KEY, migrateV5(v5, movementCategories));
       } catch { /* Try older draft formats. */ }
     }
 
@@ -426,7 +489,7 @@ export function loadDraft(storage?: DraftStorage, movementCategories: ReadonlyMa
     if (v4Raw !== null) {
       try {
         const v4: unknown = JSON.parse(v4Raw);
-        if (isV4Draft(v4)) return saveMigratedDraft(target, V4_STORAGE_KEY, migrateV4(v4));
+        if (isV4Draft(v4)) return saveMigratedDraft(target, V4_STORAGE_KEY, migrateV4(v4, movementCategories));
       } catch { /* Try older draft formats. */ }
     }
 
@@ -434,7 +497,7 @@ export function loadDraft(storage?: DraftStorage, movementCategories: ReadonlyMa
     if (v3Raw !== null) {
       try {
         const v3: unknown = JSON.parse(v3Raw);
-        if (isV3Draft(v3)) return saveMigratedDraft(target, PREVIOUS_STORAGE_KEY, migrateV3(v3));
+        if (isV3Draft(v3)) return saveMigratedDraft(target, PREVIOUS_STORAGE_KEY, migrateV3(v3, movementCategories));
       } catch { /* Try older draft formats. */ }
     }
 
@@ -454,7 +517,7 @@ export function loadDraft(storage?: DraftStorage, movementCategories: ReadonlyMa
       } catch { /* Show the invalid-draft warning below. */ }
     }
 
-    if (currentInvalid || v6Raw !== null || v5Raw !== null || v4Raw !== null || v3Raw !== null || v2Raw !== null || legacyRaw !== null) {
+    if (currentInvalid || v7Raw !== null || v6Raw !== null || v5Raw !== null || v4Raw !== null || v3Raw !== null || v2Raw !== null || legacyRaw !== null) {
       return { draft: defaultDraft(), warning: 'Le brouillon enregistré est invalide. Un nouveau projet a été ouvert.', migrated: false };
     }
     return { draft: defaultDraft(), warning: null, migrated: false };
@@ -464,7 +527,7 @@ export function loadDraft(storage?: DraftStorage, movementCategories: ReadonlyMa
 }
 
 export function hasStartedLine(line: ChoreographyLine): boolean {
-  return [line.attacker, line.handMovement, line.footMovement, line.target ?? '', line.details, line.defender, line.defenderMovement, line.defenderTarget ?? '', line.defenderDetails].some((part) => part.trim());
+  return [line.attacker, line.handMovement, line.footMovement, line.target ?? '', line.details, line.defender, line.defenderHandMovement, line.defenderFootMovement, line.defenderTarget ?? '', line.defenderDetails].some((part) => part.trim());
 }
 
 export function calculateOppositionDuration(draft: ProjectDraft): string {
@@ -514,7 +577,7 @@ export function formatChoreographyLine(line: ChoreographyLine): string {
   const target = (line.target ?? '').trim();
   const defenderTarget = (line.defenderTarget ?? '').trim();
   const movements = [line.handMovement.trim(), line.footMovement.trim(), target ? `(cible : ${target})` : ''].filter(Boolean).join(' ');
-  const reaction = defender ? [line.defenderMovement.trim(), defenderTarget ? `(cible : ${defenderTarget})` : '', line.defenderDetails.trim()].filter(Boolean).join(' ') : '';
+  const reaction = defender ? [line.defenderHandMovement.trim(), line.defenderFootMovement.trim(), defenderTarget ? `(cible : ${defenderTarget})` : '', line.defenderDetails.trim()].filter(Boolean).join(' ') : '';
   return `${line.attacker.trim()} ${movements}${details ? ` ${details}` : ''}${defender ? ` contre ${defender}${reaction ? ` qui ${reaction}` : ''}` : ''}`;
 }
 

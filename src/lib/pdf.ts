@@ -27,7 +27,7 @@ function lineRow(line: ChoreographyLine, fighters: ProjectDraft['fighters']): Pd
     cell(offensive),
     cell(line.details),
     cell(line.defender, line.defender.trim() ? defenderColor : undefined),
-    cell([line.defenderMovement, defenderTarget ? `(cible : ${defenderTarget})` : ''].filter((value) => value.trim()).join(' ')),
+    cell([line.defenderHandMovement, line.defenderFootMovement, defenderTarget ? `(cible : ${defenderTarget})` : ''].filter((value) => value.trim()).join(' ')),
     cell(line.defenderDetails),
   ];
 }

@@ -26,11 +26,12 @@ describe('PDF export', () => {
     const project = defaultDraft();
     const phrase = project.sections[0];
     if (phrase.type !== 'phrase') throw new Error('Default phrase missing');
-    phrase.lines[0] = { ...phrase.lines[0], handMovement: 'Attaque', target: 'Zone 1', defender: 'Combattant B', defenderMovement: 'Riposte', defenderTarget: 'Zone 2' };
+    phrase.lines[0] = { ...phrase.lines[0], handMovement: 'Attaque', target: 'Zone 1', defender: 'Combattant B', defenderHandMovement: 'Riposte', defenderFootMovement: 'Marche', defenderTarget: 'Zone 2' };
 
     await downloadProjectPdf(project, 'A4-landscape');
 
     expect(JSON.stringify(createPdf.mock.calls[0][0])).toContain('(cible : Zone 1)');
     expect(JSON.stringify(createPdf.mock.calls[0][0])).toContain('(cible : Zone 2)');
+    expect(JSON.stringify(createPdf.mock.calls[0][0])).toContain('Riposte Marche');
   });
 });
