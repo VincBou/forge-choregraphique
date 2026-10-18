@@ -22,7 +22,7 @@
   {
     "id": "project-info",
     "title": "Les informations générales",
-    "text": "Renseignez le titre, le club, les durées, l’intrigue et les musiques. La catégorie dépend du nombre de combattants. Le bouton calculatrice additionne la durée des phrases contenant une ligne commencée et renseigne la durée d’opposition ; vous pouvez ensuite modifier le résultat."
+    "text": "Renseignez le titre, le club, les durées, l’intrigue et les musiques. La catégorie est calculée à partir des fiches FFE renseignées : prénom, nom, licence ou capitaine coché. Le bouton calculatrice additionne la durée des phrases contenant une ligne commencée et renseigne la durée d’opposition ; vous pouvez ensuite modifier le résultat."
   },
   {
     "id": "phrases",
