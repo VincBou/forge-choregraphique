@@ -18,13 +18,14 @@ import {
   STORAGE_KEY,
   V4_STORAGE_KEY,
   V5_STORAGE_KEY,
+  V6_STORAGE_KEY,
   type ChoreographyLine,
   type ProjectDraft,
   type MovementCategory,
 } from './project';
 
 const line = (fields: Partial<ChoreographyLine> = {}): ChoreographyLine => ({
-  id: 'line-1', attacker: 'Combattant A', handMovement: 'Parade', footMovement: '', details: '', defender: '', defenderMovement: '', defenderDetails: '', ...fields,
+  id: 'line-1', attacker: 'Combattant A', handMovement: 'Parade', footMovement: '', target: '', details: '', defender: '', defenderMovement: '', defenderTarget: '', defenderDetails: '', ...fields,
 });
 const phrases = (draft: ProjectDraft) => draft.sections.filter((section) => section.type === 'phrase');
 const draftWithLines = (lines: ChoreographyLine[]) => {
@@ -47,6 +48,7 @@ describe('project formatting and validation', () => {
     const draft = defaultDraft();
     draft.fighters[0].name = '<img src=x onerror=alert(1)>';
     const json = JSON.stringify(createProjectFile(draft));
+    expect(JSON.parse(json).version).toBe(3);
     expect(parseProjectFile(json)).toEqual(draft);
 
     const withUnknownField = JSON.parse(json);
@@ -54,9 +56,14 @@ describe('project formatting and validation', () => {
     expect(parseProjectFile(JSON.stringify(withUnknownField))).toBeNull();
 
     const unknownVersion = JSON.parse(json);
-    unknownVersion.version = 3;
+    unknownVersion.version = 4;
     expect(parseProjectFile(JSON.stringify(unknownVersion))).toBeNull();
     expect(parseProjectFile(`${json}${' '.repeat(10 * 1024 * 1024)}`)).toBeNull();
+
+    const version2 = JSON.parse(json);
+    version2.version = 2;
+    for (const section of version2.project.sections) section.lines?.forEach((action: Record<string, unknown>) => { delete action.target; delete action.defenderTarget; });
+    expect(parseProjectFile(JSON.stringify(version2))?.sections[0]).toMatchObject({ lines: [{ target: '', defenderTarget: '' }] });
   });
 
   it('migrates version 1 JSON and rejects lines attached to choreographic times', () => {
@@ -64,9 +71,10 @@ describe('project formatting and validation', () => {
     const oldFile = createProjectFile(draft) as unknown as { format: string; version: number; project: Record<string, unknown> };
     const { sections, ...project } = oldFile.project as ProjectDraft & { sections: ProjectDraft['sections'] };
     oldFile.version = 1;
-    oldFile.project = { ...project, phrases: sections.map(({ type: _type, ...phrase }) => phrase) };
+    oldFile.project = { ...project, phrases: sections.flatMap((section) => section.type === 'phrase' ? [{ id: section.id, end: section.end, lines: section.lines.map(({ target: _target, defenderTarget: _defenderTarget, ...action }) => action) }] : []) };
     const migrated = parseProjectFile(JSON.stringify(oldFile));
     expect(migrated?.sections[0]).toMatchObject({ type: 'phrase', id: draft.sections[0].id });
+    expect(migrated?.sections[0]).toMatchObject({ lines: [{ target: '', defenderTarget: '' }] });
 
     const invalid = createProjectFile({ ...draft, sections: [...draft.sections, { type: 'temps', id: 'time', end: 1 }] });
     const tampered = JSON.parse(JSON.stringify(invalid));
@@ -112,6 +120,11 @@ describe('project formatting and validation', () => {
     expect(formatProject(draftWithLines([line({ defender: 'B', defenderDetails: 'se protège' })]))).toBe('0.0 - Début Phrase 1\n1.1 - Combattant A Parade contre B qui se protège\n0.0 - Fin Phrase 1');
     expect(formatProject(draftWithLines([line({ defender: 'B', defenderMovement: 'Parade' })]))).toContain('1.1 - Combattant A Parade contre B qui Parade');
     expect(formatProject(draftWithLines([line({ defender: '', defenderMovement: 'Parade', defenderDetails: 'se protège' })]))).toContain('1.1 - Combattant A Parade');
+  });
+
+  it('includes targets next to their movements in text exports', () => {
+    expect(formatProject(draftWithLines([line({ handMovement: 'Attaque', target: 'Zone 1', defender: 'B', defenderMovement: 'Riposte', defenderTarget: 'Zone 2' })])))
+      .toContain('Combattant A Attaque (cible : Zone 1) contre B qui Riposte (cible : Zone 2)');
   });
 
   it('keeps project metadata and participant records out of the current text export', () => {
@@ -255,7 +268,8 @@ describe('project formatting and validation', () => {
   });
 
   it('migrates v4 project fields and phrase timings without changing action names', () => {
-    const oldDraft = { fighters: ['Combattant A'], phrases: [{ id: 'phrase-v4', end: 8.5, lines: [line({ id: 'line-v4' })] }] };
+    const { target: _target, defenderTarget: _defenderTarget, ...oldLine } = line({ id: 'line-v4' });
+    const oldDraft = { fighters: ['Combattant A'], phrases: [{ id: 'phrase-v4', end: 8.5, lines: [oldLine] }] };
     const values = new Map([[V4_STORAGE_KEY, JSON.stringify(oldDraft)]]);
     const storage = {
       getItem: (key: string) => values.get(key) ?? null,
@@ -264,7 +278,7 @@ describe('project formatting and validation', () => {
     };
     const loaded = loadDraft(storage);
     expect(loaded.draft.fighters[0]).toMatchObject({ name: 'Combattant A', firstName: '', lastName: '' });
-    expect(phrases(loaded.draft)).toEqual(oldDraft.phrases.map((phrase) => ({ type: 'phrase', ...phrase })));
+    expect(phrases(loaded.draft)).toEqual(oldDraft.phrases.map((phrase) => ({ type: 'phrase', ...phrase, lines: phrase.lines.map((action) => ({ ...action, target: '', defenderTarget: '' })) })));
     expect(loaded.draft.info.oppositionDuration).toBe('00m:00s');
     expect(values.has(STORAGE_KEY)).toBe(true);
     expect(values.has(V4_STORAGE_KEY)).toBe(false);
@@ -274,7 +288,8 @@ describe('project formatting and validation', () => {
     const previous = defaultDraft();
     const phrase = previous.sections[0];
     if (phrase.type !== 'phrase') throw new Error('Default phrase missing');
-    const values = new Map([[V5_STORAGE_KEY, JSON.stringify({ ...previous, sections: undefined, phrases: [{ id: phrase.id, end: 7, lines: phrase.lines }] })]]);
+    const oldLines = phrase.lines.map(({ target: _target, defenderTarget: _defenderTarget, ...action }) => action);
+    const values = new Map([[V5_STORAGE_KEY, JSON.stringify({ ...previous, sections: undefined, phrases: [{ id: phrase.id, end: 7, lines: oldLines }] })]]);
     const storage = {
       getItem: (key: string) => values.get(key) ?? null,
       setItem: (key: string, value: string) => { values.set(key, value); },
@@ -284,6 +299,25 @@ describe('project formatting and validation', () => {
     expect(loaded.migrated).toBe(true);
     expect(loaded.draft.sections).toEqual([{ type: 'phrase', id: phrase.id, end: 7, lines: phrase.lines }]);
     expect(values.has(V5_STORAGE_KEY)).toBe(false);
+  });
+
+  it('migrates the local v6 draft to v7 with empty targets', () => {
+    const current = defaultDraft();
+    const first = current.sections[0];
+    if (first.type !== 'phrase') throw new Error('Default phrase missing');
+    const { target: _target, defenderTarget: _defenderTarget, ...oldLine } = first.lines[0];
+    const v6 = { ...current, sections: [{ ...first, lines: [oldLine] }] };
+    const values = new Map([[V6_STORAGE_KEY, JSON.stringify(v6)]]);
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value); },
+      removeItem: (key: string) => { values.delete(key); },
+    };
+    const loaded = loadDraft(storage);
+    expect(loaded.migrated).toBe(true);
+    expect(phrases(loaded.draft)[0].lines[0]).toMatchObject({ target: '', defenderTarget: '' });
+    expect(values.has(STORAGE_KEY)).toBe(true);
+    expect(values.has(V6_STORAGE_KEY)).toBe(false);
   });
 
   it('keeps the old draft when migration cannot be written', () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { defaultDraft, type ChoreographyLine } from './project';
 import { getRepresentationFocus, getRepresentationThreshold, parseDurationSeconds } from './representation';
 
-const line = (id: string): ChoreographyLine => ({ id, attacker: 'A', handMovement: 'Attaque', footMovement: '', details: '', defender: '', defenderMovement: '', defenderDetails: '' });
+const line = (id: string): ChoreographyLine => ({ id, attacker: 'A', handMovement: 'Attaque', footMovement: '', target: '', details: '', defender: '', defenderMovement: '', defenderTarget: '', defenderDetails: '' });
 
 describe('representation timeline', () => {
   it('parses the project duration and falls back to the chronology when it is unusable', () => {

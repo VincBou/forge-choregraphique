@@ -26,6 +26,7 @@ import {
   normalizeSingleLine,
   STORAGE_KEY,
   V4_STORAGE_KEY,
+  V6_STORAGE_KEY,
   V5_STORAGE_KEY,
   createProjectFile,
   parseProjectFile,
@@ -34,12 +35,13 @@ import {
   type Fighter,
   type Assistant,
   type ProjectInfo,
+  type ProjectDraft,
   type MovementCategory,
   type ChoreographySection,
   type PhraseDArmes,
 } from './lib/project';
 
-type Movement = { nom: string; description: string; categorie: MovementCategory; caracteristiques?: string[] };
+type Movement = { nom: string; description: string; categorie: MovementCategory; caracteristiques?: string[]; cible?: string[] };
 function isMovementList(value: unknown): value is Movement[] {
   return Array.isArray(value) && value.length <= 1000 && value.every((item) =>
     !!item && typeof item === 'object'
@@ -51,6 +53,9 @@ function isMovementList(value: unknown): value is Movement[] {
     && ((item as Movement).caracteristiques === undefined || (Array.isArray((item as Movement).caracteristiques)
       && (item as Movement).caracteristiques!.length <= 100
       && (item as Movement).caracteristiques!.every((value) => typeof value === 'string' && value.trim().length > 0 && value.length <= 100 && !/[\r\n\u0000-\u001f\u007f]/.test(value))))
+    && ((item as Movement).cible === undefined || (Array.isArray((item as Movement).cible)
+      && (item as Movement).cible!.length <= 100
+      && (item as Movement).cible!.every((value) => typeof value === 'string' && value.trim().length > 0 && value.length <= 100 && !/[\r\n\u0000-\u001f\u007f]/.test(value))))
     && ['main', 'pieds', 'combine'].includes((item as Movement).categorie));
 }
 
@@ -59,9 +64,26 @@ const combinedMovementNames = new Set(movementList.filter((movement) => movement
 const isCombinedMovement = (value: string) => combinedMovementNames.has(normalizeSearch(value.trim()));
 const characteristicsByMovement = new Map(movementList.filter((movement) => movement.caracteristiques?.length).map((movement) => [normalizeSearch(movement.nom), movement.caracteristiques ?? []]));
 const getCharacteristics = (...names: string[]) => [...new Set(names.flatMap((name) => characteristicsByMovement.get(normalizeSearch(name.trim())) ?? []))];
-const movementCategories = new Map(movementList.map((movement) => [normalizeSearch(movement.nom), movement.categorie]));
-const initialState = loadDraft(undefined, movementCategories);
-const createEmptyLine = (): ChoreographyLine => ({ id: createLineId(), attacker: '', handMovement: '', footMovement: '', details: '', defender: '', defenderMovement: '', defenderDetails: '' });
+const targetsByMovement = new Map(movementList.filter((movement) => movement.cible !== undefined).map((movement) => [normalizeSearch(movement.nom), movement.cible ?? []]));
+const getTargets = (...names: string[]) => [...new Set(names.flatMap((name) => targetsByMovement.get(normalizeSearch(name.trim())) ?? []))];
+const hasTargetField = (...names: string[]) => names.some((name) => targetsByMovement.has(normalizeSearch(name.trim())));
+const movementCategories = new Map<string, MovementCategory>(movementList.map((movement): [string, MovementCategory] => [normalizeSearch(movement.nom), movement.categorie as MovementCategory]));
+function clearIneligibleTargets(project: ProjectDraft): ProjectDraft {
+  return {
+    ...project,
+    sections: project.sections.map((section) => section.type === 'phrase' ? {
+      ...section,
+      lines: section.lines.map((line) => ({
+        ...line,
+        target: hasTargetField(line.handMovement, line.footMovement) ? line.target : '',
+        defenderTarget: line.defender.trim() && hasTargetField(line.defenderMovement) ? line.defenderTarget : '',
+      })),
+    } : section),
+  };
+}
+const loadedState = loadDraft(undefined, movementCategories);
+const initialState = { ...loadedState, draft: clearIneligibleTargets(loadedState.draft) };
+const createEmptyLine = (): ChoreographyLine => ({ id: createLineId(), attacker: '', handMovement: '', footMovement: '', target: '', details: '', defender: '', defenderMovement: '', defenderTarget: '', defenderDetails: '' });
 const createEmptyAssistant = (): Assistant => ({ id: createLineId(), firstName: '', lastName: '', licenseNumber: '', role: '' });
 const phraseSections = (sections: ChoreographySection[]) => sections.filter((section): section is PhraseDArmes => section.type === 'phrase');
 const sectionStart = (sections: ChoreographySection[], index: number) => index === 0 ? 0 : sections[index - 1].end;
@@ -401,13 +423,13 @@ export default function App() {
   function handleDefenderBlur(id: string, defender: string) {
     if (defender.trim()) return;
     const line = phraseSections(draft.sections).flatMap((phrase) => phrase.lines).find((candidate) => candidate.id === id);
-    if (!line || (!line.defenderMovement && !line.defenderDetails)) return;
+    if (!line || (!line.defenderMovement && !line.defenderTarget && !line.defenderDetails)) return;
     changeDraft({
       ...draft,
       sections: draft.sections.map((section) => section.type === 'phrase' ? ({
         ...section,
         lines: section.lines.map((candidate) => candidate.id === id
-          ? { ...candidate, defenderMovement: '', defenderDetails: '' }
+          ? { ...candidate, defenderMovement: '', defenderTarget: '', defenderDetails: '' }
           : candidate),
       }) : section),
     });
@@ -426,6 +448,7 @@ export default function App() {
     let cleared = false;
     try {
       window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(V6_STORAGE_KEY);
       window.localStorage.removeItem(V5_STORAGE_KEY);
       window.localStorage.removeItem(V4_STORAGE_KEY);
       window.localStorage.removeItem(PREVIOUS_STORAGE_KEY);
@@ -476,7 +499,7 @@ export default function App() {
       }
       if (!window.confirm('Remplacer le projet actuel par celui du fichier JSON ? Cette action ne peut pas être annulée.')) return;
       hasEdited.current = true;
-      setDraft(importedDraft);
+      setDraft(clearIneligibleTargets(importedDraft));
       setRepresentationElapsedMs(0);
       setNotice('Le projet JSON a été importé.');
       setExportError(null);
@@ -677,7 +700,7 @@ export default function App() {
           </section>
 
           <div className="notation-guide" aria-hidden="true">
-            <span>ATTAQUANT</span><span>MOUVEMENT DE MAIN</span><span>MOUVEMENT DE PIEDS</span><span>INTENTION / DÉTAIL</span><span>DÉFENSEUR</span>
+            <span>ATTAQUANT</span><span>MOUVEMENT DE MAIN</span><span>MOUVEMENT DE PIEDS</span><span>CIBLE</span><span>INTENTION / DÉTAIL</span><span>DÉFENSEUR</span>
           </div>
           <div className="phrases-list">
             {draft.sections.map((section, sectionIndex) => {
@@ -762,8 +785,9 @@ export default function App() {
                         >
                           <button className="line-number drag-handle" type="button" aria-label={`Faire glisser la ligne ${lineNumber} de ${phraseName}`} draggable onDragStart={(event) => handleLineDragStart(event, line.id)} onDragEnd={() => setDropTarget(null)}>{lineNumber}</button>
                           <AutocompleteInput id={`attacker-${line.id}`} label={`Attaquant, ligne ${lineNumber}`} value={line.attacker} suggestions={fighterSuggestions} placeholder="Choisir ou saisir" required maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'attacker', value)} />
-                          <AutocompleteInput id={`hand-movement-${line.id}`} label={`Mouvement de main, ligne ${lineNumber}`} value={line.handMovement} suggestions={handSuggestions} placeholder="Mouvement de main" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'handMovement', value)} />
-                          {!(isCombinedMovement(line.handMovement) && !line.footMovement.trim()) && <AutocompleteInput id={`foot-movement-${line.id}`} label={`Mouvement de pieds, ligne ${lineNumber}`} value={line.footMovement} suggestions={footSuggestions} placeholder="Mouvement de pieds" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'footMovement', value)} />}
+                          <AutocompleteInput id={`hand-movement-${line.id}`} className="hand-movement-autocomplete" label={`Mouvement de main, ligne ${lineNumber}`} value={line.handMovement} suggestions={handSuggestions} placeholder="Mouvement de main" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'handMovement', value)} onBlur={() => { if (line.target && !hasTargetField(line.handMovement, line.footMovement)) updateLine(line.id, 'target', ''); }} />
+                          {!(isCombinedMovement(line.handMovement) && !line.footMovement.trim()) && <AutocompleteInput id={`foot-movement-${line.id}`} className="foot-movement-autocomplete" label={`Mouvement de pieds, ligne ${lineNumber}`} value={line.footMovement} suggestions={footSuggestions} placeholder="Mouvement de pieds" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'footMovement', value)} onBlur={() => { if (line.target && !hasTargetField(line.handMovement, line.footMovement)) updateLine(line.id, 'target', ''); }} />}
+                          {hasTargetField(line.handMovement, line.footMovement) && <AutocompleteInput id={`target-${line.id}`} className="target-autocomplete" label={`Cible, ligne ${lineNumber}`} value={line.target} suggestions={getTargets(line.handMovement, line.footMovement)} placeholder="Cible" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'target', value)} />}
                           <AutocompleteInput id={`details-${line.id}`} className="details-autocomplete" label={`Détail libre, ligne ${lineNumber}`} value={line.details} suggestions={getCharacteristics(line.handMovement, line.footMovement)} placeholder="Ajouter un détail…" maxLength={MAX_DETAILS_LENGTH} commaDelimited onChange={(value) => updateLine(line.id, 'details', value)} />
                           <div className="defender-group">
                             {line.defender.trim() && <span className="against-label">contre</span>}
@@ -772,7 +796,8 @@ export default function App() {
                           {line.defender.trim() && (
                             <div className="defender-reaction">
                               <span className="reaction-intro">qui</span>
-                              <AutocompleteInput id={`defender-movement-${line.id}`} label={`Mouvement de réaction du défenseur, ligne ${lineNumber}`} value={line.defenderMovement} suggestions={movementSuggestions} placeholder="Mouvement de réaction" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'defenderMovement', value)} />
+                              <AutocompleteInput id={`defender-movement-${line.id}`} label={`Mouvement de réaction du défenseur, ligne ${lineNumber}`} value={line.defenderMovement} suggestions={movementSuggestions} placeholder="Mouvement de réaction" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'defenderMovement', value)} onBlur={() => { if (line.defenderTarget && !hasTargetField(line.defenderMovement)) updateLine(line.id, 'defenderTarget', ''); }} />
+                              {hasTargetField(line.defenderMovement) && <AutocompleteInput id={`defender-target-${line.id}`} className="target-autocomplete" label={`Cible de réaction du défenseur, ligne ${lineNumber}`} value={line.defenderTarget} suggestions={getTargets(line.defenderMovement)} placeholder="Cible" maxLength={MAX_NAME_LENGTH} onChange={(value) => updateLine(line.id, 'defenderTarget', value)} />}
                               <AutocompleteInput id={`defender-details-${line.id}`} className="details-autocomplete" label={`Détail de réaction du défenseur, ligne ${lineNumber}`} value={line.defenderDetails} suggestions={getCharacteristics(line.defenderMovement)} placeholder="Détail / intention" maxLength={MAX_DETAILS_LENGTH} commaDelimited onChange={(value) => updateLine(line.id, 'defenderDetails', value)} />
                             </div>
                           )}

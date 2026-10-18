@@ -164,6 +164,30 @@ describe('App security and editor basics', () => {
     expect(reactionDetails).toHaveValue('ligne, dessus');
   });
 
+  it('offers target suggestions for eligible attacker and defender movements and clears targets after ineligible changes', () => {
+    render(<App />);
+    const hand = screen.getByRole('combobox', { name: 'Mouvement de main, ligne 1.1' });
+    expect(screen.queryByRole('combobox', { name: 'Cible, ligne 1.1' })).not.toBeInTheDocument();
+    fireEvent.change(hand, { target: { value: 'Attaque' } });
+    const target = screen.getByRole('combobox', { name: 'Cible, ligne 1.1' });
+    fireEvent.focus(target);
+    expect(within(screen.getByRole('listbox', { name: /Cible/ })).getByRole('option', { name: 'Zone 1' })).toBeInTheDocument();
+    fireEvent.change(target, { target: { value: 'Zone personnalisée' } });
+    fireEvent.change(hand, { target: { value: 'Parade' } });
+    fireEvent.blur(hand);
+    expect(screen.queryByRole('combobox', { name: 'Cible, ligne 1.1' })).not.toBeInTheDocument();
+    expect(JSON.parse(window.localStorage.getItem('forgechoree.project.v7') ?? '{}').sections[0].lines[0].target).toBe('');
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Défenseur facultatif, ligne 1.1' }), { target: { value: 'Combattant B' } });
+    const reaction = screen.getByRole('combobox', { name: 'Mouvement de réaction du défenseur, ligne 1.1' });
+    fireEvent.change(reaction, { target: { value: 'Riposte' } });
+    const defenderTarget = screen.getByRole('combobox', { name: 'Cible de réaction du défenseur, ligne 1.1' });
+    fireEvent.change(defenderTarget, { target: { value: 'Zone 2' } });
+    fireEvent.change(reaction, { target: { value: 'Parade' } });
+    fireEvent.blur(reaction);
+    expect(screen.queryByRole('combobox', { name: 'Cible de réaction du défenseur, ligne 1.1' })).not.toBeInTheDocument();
+  });
+
   it('keeps each phrase as one parent group and starts the next at the previous end', () => {
     const { container } = render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Ajouter une ligne après 1.1' }));
@@ -226,7 +250,7 @@ describe('App security and editor basics', () => {
     expect(screen.getByRole('spinbutton', { name: 'Fin de Phrase d’armes 2' })).toHaveValue(15);
     expect(within(screen.getByRole('region', { name: 'Phrase d’armes 2' })).getByText('10.0')).toBeInTheDocument();
     expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Phrase d’armes 2' }));
-    expect(JSON.parse(window.localStorage.getItem('forgechoree.project.v6') ?? '{}').sections.filter((section: { type: string }) => section.type === 'phrase').map((phrase: { end: number }) => phrase.end)).toEqual([10, 15]);
+    expect(JSON.parse(window.localStorage.getItem('forgechoree.project.v7') ?? '{}').sections.filter((section: { type: string }) => section.type === 'phrase').map((phrase: { end: number }) => phrase.end)).toEqual([10, 15]);
     expect(container.querySelectorAll('.phrase-group')).toHaveLength(2);
   });
 
@@ -254,7 +278,7 @@ describe('App security and editor basics', () => {
     expect(screen.getByRole('spinbutton', { name: 'Fin de Phrase d’armes 2' })).toHaveValue(5.5);
     const secondPhrase = screen.getByRole('region', { name: 'Phrase d’armes 2' });
     expect(within(secondPhrase).getByText('5.5')).toBeInTheDocument();
-    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v6') ?? '{}');
+    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v7') ?? '{}');
     expect(savedDraft.sections[0].end).toBe(5.5);
     expect(savedDraft.sections[1].end).toBe(5.5);
     fireEvent.click(screen.getByRole('button', { name: 'Calculer la durée d’opposition' }));
@@ -280,7 +304,7 @@ describe('App security and editor basics', () => {
     expect(attacker1).toHaveValue('Alice');
     expect(defender1).toHaveValue('Alice');
     expect(screen.getByRole('combobox', { name: 'Attaquant, ligne 1.2' })).toHaveValue('Combattant A bis');
-    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v6') ?? '{}');
+    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v7') ?? '{}');
     expect(savedDraft.fighters[0].name).toBe('Alice');
     expect(savedDraft.sections[0].lines[0].attacker).toBe('Alice');
     expect(savedDraft.sections[0].lines[0].defender).toBe('Alice');
@@ -332,7 +356,7 @@ describe('App security and editor basics', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Prénom de l’assistant 1' }), { target: { value: 'Sam' } });
     fireEvent.change(screen.getByRole('textbox', { name: 'Rôle de l’assistant 1' }), { target: { value: 'Figurant' } });
 
-    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v6') ?? '{}');
+    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v7') ?? '{}');
     expect(savedDraft.info).toMatchObject({ title: 'Le duel', notes: 'Une intrigue\nUne musique', ensemble: true });
     expect(savedDraft.assistants[0]).toMatchObject({ firstName: 'Sam', role: 'Figurant' });
   });
@@ -394,7 +418,7 @@ describe('App security and editor basics', () => {
     expect(window.localStorage.getItem('forgechoree.project.v2')).toBeNull();
     expect(window.localStorage.getItem('forgechoree.project.v3')).toBeNull();
     expect(window.localStorage.getItem('forgechoree.project.v4')).toBeNull();
-    expect(window.localStorage.getItem('forgechoree.project.v6')).toBeNull();
+    expect(window.localStorage.getItem('forgechoree.project.v7')).toBeNull();
     expect(screen.getByText(/brouillon local a été effacé/i)).toHaveAttribute('role', 'status');
   });
 });

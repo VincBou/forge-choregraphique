@@ -1,4 +1,5 @@
-export const STORAGE_KEY = 'forgechoree.project.v6';
+export const STORAGE_KEY = 'forgechoree.project.v7';
+export const V6_STORAGE_KEY = 'forgechoree.project.v6';
 export const V5_STORAGE_KEY = 'forgechoree.project.v5';
 export const PREVIOUS_STORAGE_KEY = 'forgechoree.project.v3';
 export const OLDER_STORAGE_KEY = 'forgechoree.project.v2';
@@ -46,9 +47,11 @@ export type ChoreographyLine = {
   attacker: string;
   handMovement: string;
   footMovement: string;
+  target: string;
   details: string;
   defender: string;
   defenderMovement: string;
+  defenderTarget: string;
   defenderDetails: string;
 };
 
@@ -71,7 +74,7 @@ export type ProjectDraft = {
 
 export type ProjectFile = {
   format: 'forge-choregraphique';
-  version: 2;
+  version: 3;
   project: ProjectDraft;
 };
 
@@ -90,7 +93,7 @@ export const createLineId = (): string => typeof crypto !== 'undefined' && 'rand
 
 const createFighter = (name: string): Fighter => ({ id: createLineId(), name, firstName: '', lastName: '', licenseNumber: '', captain: false });
 const createEmptyProjectInfo = (): ProjectInfo => ({ title: '', club: '', duration: '00m:00s', oppositionDuration: '00m:00s', notes: '', ensemble: false });
-const createEmptyLine = (): ChoreographyLine => ({ id: createLineId(), attacker: '', handMovement: '', footMovement: '', details: '', defender: '', defenderMovement: '', defenderDetails: '' });
+const createEmptyLine = (): ChoreographyLine => ({ id: createLineId(), attacker: '', handMovement: '', footMovement: '', target: '', details: '', defender: '', defenderMovement: '', defenderTarget: '', defenderDetails: '' });
 
 export const defaultDraft = (): ProjectDraft => ({
   info: createEmptyProjectInfo(),
@@ -168,9 +171,11 @@ function isValidChoreographyLine(value: unknown, ids: Set<string>): value is Cho
     && isValidText(line.attacker, MAX_NAME_LENGTH)
     && isValidText(line.handMovement, MAX_NAME_LENGTH)
     && isValidText(line.footMovement, MAX_NAME_LENGTH)
+    && (line.target === undefined || isValidText(line.target, MAX_NAME_LENGTH))
     && isValidText(line.defender, MAX_NAME_LENGTH)
     && isValidText(line.details, MAX_DETAILS_LENGTH)
     && isValidText(line.defenderMovement, MAX_NAME_LENGTH)
+    && (line.defenderTarget === undefined || isValidText(line.defenderTarget, MAX_NAME_LENGTH))
     && isValidText(line.defenderDetails, MAX_DETAILS_LENGTH);
 }
 
@@ -219,7 +224,7 @@ function hasExactKeys(value: unknown, keys: string[]): value is Record<string, u
   return actual.length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 }
 
-function sanitizeProjectDraft(value: unknown, rejectUnknown = true): ProjectDraft | null {
+function sanitizeProjectDraft(value: unknown, rejectUnknown = true, allowMissingTargets = false): ProjectDraft | null {
   if (!isProjectDraft(value)) return null;
   const draft = value;
   const exactShape = hasExactKeys(draft, ['info', 'fighters', 'assistants', 'sections'])
@@ -228,7 +233,9 @@ function sanitizeProjectDraft(value: unknown, rejectUnknown = true): ProjectDraf
     && draft.assistants.every((assistant) => hasExactKeys(assistant, ['id', 'firstName', 'lastName', 'licenseNumber', 'role']))
     && draft.sections.every((section) => section.type === 'phrase'
       ? hasExactKeys(section, ['type', 'id', 'end', 'lines'])
-        && section.lines.every((line) => hasExactKeys(line, ['id', 'attacker', 'handMovement', 'footMovement', 'details', 'defender', 'defenderMovement', 'defenderDetails']))
+        && section.lines.every((line) => hasExactKeys(line, allowMissingTargets
+          ? ['id', 'attacker', 'handMovement', 'footMovement', 'details', 'defender', 'defenderMovement', 'defenderDetails']
+          : ['id', 'attacker', 'handMovement', 'footMovement', 'target', 'details', 'defender', 'defenderMovement', 'defenderTarget', 'defenderDetails']))
       : hasExactKeys(section, ['type', 'id', 'end']) && section.type === 'temps');
   if (rejectUnknown && !exactShape) return null;
 
@@ -238,8 +245,8 @@ function sanitizeProjectDraft(value: unknown, rejectUnknown = true): ProjectDraf
     assistants: draft.assistants.map(({ id, firstName, lastName, licenseNumber, role }) => ({ id, firstName, lastName, licenseNumber, role })),
     sections: draft.sections.map((section) => section.type === 'temps'
       ? { type: 'temps', id: section.id, end: section.end }
-      : { type: 'phrase', id: section.id, end: section.end, lines: section.lines.map(({ id, attacker, handMovement, footMovement, details, defender, defenderMovement, defenderDetails }) => ({
-        id, attacker, handMovement, footMovement, details, defender, defenderMovement, defenderDetails,
+      : { type: 'phrase', id: section.id, end: section.end, lines: section.lines.map(({ id, attacker, handMovement, footMovement, target, details, defender, defenderMovement, defenderTarget, defenderDetails }) => ({
+        id, attacker, handMovement, footMovement, target: target ?? '', details, defender, defenderMovement, defenderTarget: defenderTarget ?? '', defenderDetails,
       })) }),
   };
 }
@@ -261,14 +268,14 @@ function sanitizeV5Draft(value: unknown): V5Draft | null {
     && draft.fighters.every((fighter) => hasExactKeys(fighter, ['id', 'name', 'firstName', 'lastName', 'licenseNumber', 'captain']))
     && draft.assistants.every((assistant) => hasExactKeys(assistant, ['id', 'firstName', 'lastName', 'licenseNumber', 'role']))
     && draft.phrases.every((phrase) => hasExactKeys(phrase, ['id', 'end', 'lines'])
-      && phrase.lines.every((line) => hasExactKeys(line, ['id', 'attacker', 'handMovement', 'footMovement', 'details', 'defender', 'defenderMovement', 'defenderDetails'])));
+        && phrase.lines.every((line) => hasExactKeys(line, ['id', 'attacker', 'handMovement', 'footMovement', 'details', 'defender', 'defenderMovement', 'defenderDetails'])));
   return exact ? draft : null;
 }
 
 export function createProjectFile(project: ProjectDraft): ProjectFile {
   const safeProject = sanitizeProjectDraft(project, false);
   if (!safeProject) throw new TypeError('Invalid project draft');
-  return { format: 'forge-choregraphique', version: 2, project: safeProject };
+  return { format: 'forge-choregraphique', version: 3, project: safeProject };
 }
 
 export function parseProjectFile(json: string): ProjectDraft | null {
@@ -276,8 +283,9 @@ export function parseProjectFile(json: string): ProjectDraft | null {
   try {
     const value: unknown = JSON.parse(json.charCodeAt(0) === 0xfeff ? json.slice(1) : json);
     if (!hasExactKeys(value, ['format', 'version', 'project'])
-      || value.format !== 'forge-choregraphique' || ![1, 2].includes(value.version as number)) return null;
-    if (value.version === 2) return sanitizeProjectDraft(value.project);
+      || value.format !== 'forge-choregraphique' || ![1, 2, 3].includes(value.version as number)) return null;
+    if (value.version === 3) return sanitizeProjectDraft(value.project);
+    if (value.version === 2) return sanitizeProjectDraft(value.project, true, true);
     const legacy = sanitizeV5Draft(value.project);
     return legacy ? migrateV5(legacy) : null;
   } catch {
@@ -338,17 +346,17 @@ function wrapLinesInFirstPhrase(fighters: string[], lines: ChoreographyLine[]): 
 export function migrateLegacyDraft(legacy: LegacyDraft, movementCategories: ReadonlyMap<string, MovementCategory>): ProjectDraft {
   const lines = legacy.lines.map(({ action, ...line }) => {
     const category = movementCategories.get(normalizeSearch(action.trim())) ?? 'main';
-    return { ...line, handMovement: category === 'pieds' ? '' : action, footMovement: category === 'pieds' ? action : '', defenderMovement: '', defenderDetails: '' };
+    return { ...line, handMovement: category === 'pieds' ? '' : action, footMovement: category === 'pieds' ? action : '', target: '', defenderMovement: '', defenderTarget: '', defenderDetails: '' };
   });
   return wrapLinesInFirstPhrase(legacy.fighters, lines);
 }
 
 function migrateV2(draft: V2Draft): ProjectDraft {
-  return wrapLinesInFirstPhrase(draft.fighters, draft.lines.map((line) => ({ ...line, defenderMovement: '', defenderDetails: '' })));
+  return wrapLinesInFirstPhrase(draft.fighters, draft.lines.map((line) => ({ ...line, target: '', defenderMovement: '', defenderTarget: '', defenderDetails: '' })));
 }
 
 function migrateV3(draft: V3Draft): ProjectDraft {
-  return wrapLinesInFirstPhrase(draft.fighters, draft.lines);
+  return wrapLinesInFirstPhrase(draft.fighters, draft.lines.map((line) => ({ ...line, target: '', defenderTarget: '' })));
 }
 
 function migrateV4(draft: { fighters: string[]; phrases: LegacyPhrase[] }): ProjectDraft {
@@ -356,13 +364,13 @@ function migrateV4(draft: { fighters: string[]; phrases: LegacyPhrase[] }): Proj
   return {
     ...migrated,
     fighters: draft.fighters.map(createFighter),
-    sections: draft.phrases.map((phrase) => ({ type: 'phrase', ...phrase, lines: phrase.lines.map((line) => ({ ...line })) })),
+    sections: draft.phrases.map((phrase) => ({ type: 'phrase', ...phrase, lines: phrase.lines.map((line) => ({ ...line, target: '', defenderTarget: '' })) })),
   };
 }
 
 function migrateV5(draft: V5Draft): ProjectDraft {
   return { info: draft.info, fighters: draft.fighters, assistants: draft.assistants,
-    sections: draft.phrases.map((phrase) => ({ type: 'phrase', ...phrase })) };
+    sections: draft.phrases.map((phrase) => ({ type: 'phrase', ...phrase, lines: phrase.lines.map((line) => ({ ...line, target: '', defenderTarget: '' })) })) };
 }
 
 function isV5Draft(value: unknown): value is V5Draft {
@@ -391,9 +399,19 @@ export function loadDraft(storage?: DraftStorage, movementCategories: ReadonlyMa
     if (currentRaw !== null) {
       try {
         const current: unknown = JSON.parse(currentRaw);
-        if (isProjectDraft(current)) return { draft: current, warning: null, migrated: false };
+        const sanitized = sanitizeProjectDraft(current);
+        if (sanitized) return { draft: sanitized, warning: null, migrated: false };
         currentInvalid = true;
       } catch { currentInvalid = true; }
+    }
+
+    const v6Raw = target.getItem(V6_STORAGE_KEY);
+    if (v6Raw !== null) {
+      try {
+        const v6: unknown = JSON.parse(v6Raw);
+        const migrated = sanitizeProjectDraft(v6, true, true);
+        if (migrated) return saveMigratedDraft(target, V6_STORAGE_KEY, migrated);
+      } catch { /* Try older draft formats. */ }
     }
 
     const v5Raw = target.getItem(V5_STORAGE_KEY);
@@ -436,7 +454,7 @@ export function loadDraft(storage?: DraftStorage, movementCategories: ReadonlyMa
       } catch { /* Show the invalid-draft warning below. */ }
     }
 
-    if (currentInvalid || v5Raw !== null || v4Raw !== null || v3Raw !== null || v2Raw !== null || legacyRaw !== null) {
+    if (currentInvalid || v6Raw !== null || v5Raw !== null || v4Raw !== null || v3Raw !== null || v2Raw !== null || legacyRaw !== null) {
       return { draft: defaultDraft(), warning: 'Le brouillon enregistré est invalide. Un nouveau projet a été ouvert.', migrated: false };
     }
     return { draft: defaultDraft(), warning: null, migrated: false };
@@ -446,7 +464,7 @@ export function loadDraft(storage?: DraftStorage, movementCategories: ReadonlyMa
 }
 
 export function hasStartedLine(line: ChoreographyLine): boolean {
-  return [line.attacker, line.handMovement, line.footMovement, line.details, line.defender, line.defenderMovement, line.defenderDetails].some((part) => part.trim());
+  return [line.attacker, line.handMovement, line.footMovement, line.target ?? '', line.details, line.defender, line.defenderMovement, line.defenderTarget ?? '', line.defenderDetails].some((part) => part.trim());
 }
 
 export function calculateOppositionDuration(draft: ProjectDraft): string {
@@ -493,8 +511,10 @@ function formatTime(value: number): string {
 export function formatChoreographyLine(line: ChoreographyLine): string {
   const details = line.details.trim();
   const defender = line.defender.trim();
-  const movements = [line.handMovement.trim(), line.footMovement.trim()].filter(Boolean).join(' ');
-  const reaction = defender ? [line.defenderMovement.trim(), line.defenderDetails.trim()].filter(Boolean).join(' ') : '';
+  const target = (line.target ?? '').trim();
+  const defenderTarget = (line.defenderTarget ?? '').trim();
+  const movements = [line.handMovement.trim(), line.footMovement.trim(), target ? `(cible : ${target})` : ''].filter(Boolean).join(' ');
+  const reaction = defender ? [line.defenderMovement.trim(), defenderTarget ? `(cible : ${defenderTarget})` : '', line.defenderDetails.trim()].filter(Boolean).join(' ') : '';
   return `${line.attacker.trim()} ${movements}${details ? ` ${details}` : ''}${defender ? ` contre ${defender}${reaction ? ` qui ${reaction}` : ''}` : ''}`;
 }
 

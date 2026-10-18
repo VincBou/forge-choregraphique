@@ -19,13 +19,15 @@ function cell(text: string, fillColor?: string, bold = false): PdfCell {
 function lineRow(line: ChoreographyLine, fighters: ProjectDraft['fighters']): PdfCell[] {
   const attackerColor = colors[fighters.findIndex((fighter) => fighter.name === line.attacker.trim()) % colors.length];
   const defenderColor = colors[fighters.findIndex((fighter) => fighter.name === line.defender.trim()) % colors.length];
-  const offensive = [line.handMovement, line.footMovement].filter((value) => value.trim()).join(' / ');
+  const target = (line.target ?? '').trim();
+  const defenderTarget = (line.defenderTarget ?? '').trim();
+  const offensive = [line.handMovement, line.footMovement, target ? `(cible : ${target})` : ''].filter((value) => value.trim()).join(' / ');
   return [
     cell(line.attacker, attackerColor),
     cell(offensive),
     cell(line.details),
     cell(line.defender, line.defender.trim() ? defenderColor : undefined),
-    cell(line.defenderMovement),
+    cell([line.defenderMovement, defenderTarget ? `(cible : ${defenderTarget})` : ''].filter((value) => value.trim()).join(' ')),
     cell(line.defenderDetails),
   ];
 }

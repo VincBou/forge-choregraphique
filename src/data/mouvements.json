@@ -192,7 +192,9 @@
   {
     "nom": "Riposte",
     "description": "Action offensive portée immédiatement après une protection.",
-    "categorie": "main"
+    "categorie": "main",
+    "caracteristiques": ["directe", "indirecte", "avec préparation", "simple", "composée", "avec remise", "horizontale", "verticale descendante", "verticale ascendante", "oblique descendante", "oblique ascendante", "intérieure", "extérieure", "par-dessus", "par-dessous", "légère (shim)", "modérée (cho)", "puissante (sai)"],
+    "cible":["Zone 1","Zone 2","Zone 3","Zone 4","Zone 5","Zone 6"]
   },
   {
     "nom": "Battement",
@@ -203,7 +205,8 @@
     "nom": "Attaque",
     "description": "Action offensive visant à toucher l'adversaire par la mise en mouvement de la lame vers une zone cible, avec allongement du bras. Elle se caractérise par une trajectoire et une intensité.",
     "categorie": "main",
-    "caracteristiques": ["directe", "indirecte", "avec préparation", "simple", "composée", "avec remise", "horizontale", "verticale descendante", "verticale ascendante", "oblique descendante", "oblique ascendante", "intérieure", "extérieure", "par-dessus", "par-dessous", "légère (shim)", "modérée (cho)", "puissante (sai)"]
+    "caracteristiques": ["directe", "indirecte", "avec préparation", "simple", "composée", "avec remise", "horizontale", "verticale descendante", "verticale ascendante", "oblique descendante", "oblique ascendante", "intérieure", "extérieure", "par-dessus", "par-dessous", "légère (shim)", "modérée (cho)", "puissante (sai)"],
+    "cible":["Zone 1","Zone 2","Zone 3","Zone 4","Zone 5","Zone 6"]
   },
   {
     "nom": "Estoc",
