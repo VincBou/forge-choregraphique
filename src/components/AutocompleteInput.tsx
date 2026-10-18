@@ -10,6 +10,7 @@ type Props = {
   maxLength?: number;
   required?: boolean;
   commaDelimited?: boolean;
+  contentSized?: boolean;
   className?: string;
   onChange: (value: string) => void;
   onBlur?: (value: string) => void;
@@ -24,16 +25,41 @@ export default function AutocompleteInput({
   maxLength = 100,
   required = false,
   commaDelimited = false,
+  contentSized = false,
   className,
   onChange,
   onBlur,
 }: Props) {
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const measureRef = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [caret, setCaret] = useState(value.length);
   const [pendingCaret, setPendingCaret] = useState<number | null>(null);
+  const [contentWidth, setContentWidth] = useState<number>();
+  useLayoutEffect(() => {
+    if (!contentSized) return;
+    const input = inputRef.current;
+    const measure = measureRef.current;
+    if (!input || !measure) return;
+
+    const resizeToText = () => {
+      const style = window.getComputedStyle(input);
+      measure.style.font = style.font;
+      measure.style.letterSpacing = style.letterSpacing;
+      measure.textContent = value || placeholder || '';
+      const textWidth = measure.getBoundingClientRect().width;
+      const padding = Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.paddingRight);
+      const borders = Number.parseFloat(style.borderLeftWidth) + Number.parseFloat(style.borderRightWidth);
+      const contentWidth = textWidth + padding + borders;
+      setContentWidth(Math.ceil(contentWidth));
+    };
+
+    resizeToText();
+    window.addEventListener('resize', resizeToText);
+    return () => window.removeEventListener('resize', resizeToText);
+  }, [contentSized, placeholder, value]);
   useLayoutEffect(() => {
     if (pendingCaret === null) return;
     inputRef.current?.setSelectionRange(pendingCaret, pendingCaret);
@@ -77,8 +103,9 @@ export default function AutocompleteInput({
   }
 
   return (
-    <div className={`autocomplete${className ? ` ${className}` : ''}`}>
+    <div className={`autocomplete${contentSized ? ' autocomplete-content-sized' : ''}${className ? ` ${className}` : ''}`} style={contentSized && contentWidth ? { width: `${contentWidth}px` } : undefined}>
       <label className="sr-only" htmlFor={id}>{label}</label>
+      {contentSized && <span ref={measureRef} className="autocomplete-measure" aria-hidden="true" />}
       <input
         ref={inputRef}
         id={id}
