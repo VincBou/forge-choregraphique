@@ -37,7 +37,7 @@
   {
     "id": "lines",
     "title": "Les lignes d’action",
-    "text": "Saisissez l’attaquant, ses mouvements de main et de pieds, puis ses détails. Vous pouvez ensuite renseigner un défenseur et ses réactions de main et de pieds. Le bouton + ajoute une ligne ; les flèches ou le glisser-déposer permettent de la déplacer. Certains mouvements proposent aussi un champ Cible.",
+    "text": "Saisissez l’attaquant, ses mouvements de main et de pieds, puis ses détails cumulables en séparant avec des virgules. Vous pouvez ensuite renseigner un défenseur et ses réactions de main et de pieds. Le bouton + ajoute une ligne ; les flèches ou le glisser-déposer permettent de la déplacer. Certains mouvements proposent aussi un champ Cible.",
     "textEmpty": "Cette phrase ne contient pas encore de ligne. Cliquez sur « Ajouter la première ligne » pour créer votre première action."
   },
   {
