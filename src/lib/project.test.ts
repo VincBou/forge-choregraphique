@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   calculateOppositionDuration,
   calculateProjectCategory,
+  createKataBlockFile,
   createProjectFile,
   defaultDraft,
   formatProject,
@@ -14,6 +15,7 @@ import {
   normalizeMultiLine,
   normalizeSingleLine,
   parseProjectFile,
+  parseKataBlockFile,
   OLDER_STORAGE_KEY,
   PREVIOUS_STORAGE_KEY,
   STORAGE_KEY,
@@ -39,6 +41,18 @@ const draftWithLines = (lines: ChoreographyLine[]) => {
 };
 
 describe('project formatting and validation', () => {
+  it('round trips a tagged Kata phrase without its internal identifiers', () => {
+    const phrase = defaultDraft().sections[0];
+    if (phrase.type !== 'phrase') throw new Error('Default phrase missing');
+    phrase.end = 4;
+    phrase.lines[0] = line({ attacker: 'Source A', defender: 'Source B' });
+    const file = createKataBlockFile(phrase, 'Mon bloc');
+    expect(file).toMatchObject({ version: 6, bloc_kata: true, nom: 'Mon bloc', phrase: { end: 4 } });
+    expect(parseKataBlockFile(JSON.stringify(file))).toMatchObject({ name: 'Mon bloc', end: 4, lines: [{ attacker: 'Source A', defender: 'Source B' }] });
+    expect(parseProjectFile(JSON.stringify(file))).toBeNull();
+    expect(parseKataBlockFile(JSON.stringify({ ...file, phrase: { ...file.phrase, injected: true } }))).toBeNull();
+  });
+
   it('calculates categories from each non-empty FFE field', () => {
     const blank = defaultDraft().fighters[0];
     const fichaFields = [
@@ -71,7 +85,7 @@ describe('project formatting and validation', () => {
     const draft = defaultDraft();
     draft.fighters[0].name = '<img src=x onerror=alert(1)>';
     const json = JSON.stringify(createProjectFile(draft));
-    expect(JSON.parse(json).version).toBe(5);
+    expect(JSON.parse(json).version).toBe(6);
     expect(parseProjectFile(json)).toEqual(draft);
 
     const withUnknownField = JSON.parse(json);
@@ -79,7 +93,7 @@ describe('project formatting and validation', () => {
     expect(parseProjectFile(JSON.stringify(withUnknownField))).toBeNull();
 
     const unknownVersion = JSON.parse(json);
-    unknownVersion.version = 6;
+    unknownVersion.version = 7;
     expect(parseProjectFile(JSON.stringify(unknownVersion))).toBeNull();
     expect(parseProjectFile(`${json}${' '.repeat(10 * 1024 * 1024)}`)).toBeNull();
 

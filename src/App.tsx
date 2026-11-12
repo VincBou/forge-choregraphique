@@ -5,10 +5,12 @@ import GuidedTour from './components/GuidedTour';
 import RepresentationView from './components/RepresentationView';
 import {
   createLineId,
+  createKataBlockFile,
   calculateProjectCategory,
   calculateOppositionDuration,
   defaultDraft,
   formatProject,
+  formatKataLine,
   getExportError,
   hasStartedLine,
   loadDraft,
@@ -33,6 +35,7 @@ import {
   V7_STORAGE_KEY,
   createProjectFile,
   parseProjectFile,
+  parseKataBlockFile,
   MAX_PROJECT_FILE_BYTES,
   type ChoreographyLine,
   type Fighter,
@@ -42,6 +45,8 @@ import {
   type MovementCategory,
   type ChoreographySection,
   type PhraseDArmes,
+  type ParsedKataBlock,
+  V9_STORAGE_KEY,
 } from './lib/project';
 
 type Movement = { nom: string; description: string; categorie: MovementCategory; caracteristiques?: string[]; cible?: string[] };
@@ -105,6 +110,10 @@ export default function App() {
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
   const [pdfFormat, setPdfFormat] = useState('A4-landscape');
+  const [kataNameOpen, setKataNameOpen] = useState(false);
+  const [kataName, setKataName] = useState('');
+  const [pendingKataBlock, setPendingKataBlock] = useState<ParsedKataBlock | null>(null);
+  const [kataMappings, setKataMappings] = useState<Record<string, string>>({});
   const [representationOpen, setRepresentationOpen] = useState(false);
   const [representationElapsedMs, setRepresentationElapsedMs] = useState(0);
   const hasEdited = useRef(false);
@@ -112,6 +121,8 @@ export default function App() {
   const downloadMenuRef = useRef<HTMLDivElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const pdfDialogRef = useRef<HTMLDialogElement>(null);
+  const kataExportDialogRef = useRef<HTMLDialogElement>(null);
+  const kataImportDialogRef = useRef<HTMLDialogElement>(null);
   const fighterSuggestions = useMemo(() => draft.fighters.map((fighter) => fighter.name).filter(Boolean), [draft.fighters]);
   const handSuggestions = useMemo(() => movementList.filter((movement) => movement.categorie === 'main' || movement.categorie === 'combine').map((movement) => movement.nom), []);
   const footSuggestions = useMemo(() => movementList.filter((movement) => movement.categorie === 'pieds').map((movement) => movement.nom), []);
@@ -156,12 +167,30 @@ export default function App() {
   }, [pdfDialogOpen]);
 
   useEffect(() => {
+    for (const [dialog, open] of [[kataExportDialogRef.current, kataNameOpen], [kataImportDialogRef.current, !!pendingKataBlock]] as const) {
+      if (open && dialog && !dialog.open) {
+        if (typeof dialog.showModal === 'function') dialog.showModal();
+        else dialog.setAttribute('open', '');
+      }
+    }
+  }, [kataNameOpen, pendingKataBlock]);
+
+  useEffect(() => {
     if (!pendingPhraseFocus.current) return;
     document.querySelector<HTMLElement>(`[data-phrase-focus="${pendingPhraseFocus.current}"]`)?.focus();
     pendingPhraseFocus.current = null;
   }, [draft.sections]);
 
   function changeDraft(nextDraft: typeof draft) {
+    const hasKataBlocks = draft.sections.some((section) => section.type === 'phrase' && section.kataBlock);
+    if (hasKataBlocks && calculateProjectCategory(nextDraft.fighters, nextDraft.info.ensemble) !== 'Kata') {
+      if (!window.confirm('Ce changement convertira définitivement les blocs Kata en phrases d’armes modifiables. Continuer ?')) return;
+      nextDraft = { ...nextDraft, sections: nextDraft.sections.map((section) => {
+        if (section.type !== 'phrase' || !section.kataBlock) return section;
+        const { kataBlock: _kataBlock, ...phrase } = section;
+        return phrase;
+      }) };
+    }
     hasEdited.current = true;
     setDraft(nextDraft);
     setRepresentationElapsedMs(0);
@@ -225,6 +254,7 @@ export default function App() {
   }
 
   function updateLine(id: string, field: keyof Omit<ChoreographyLine, 'id'>, value: string) {
+    if (draft.sections.some((section) => section.type === 'phrase' && section.kataBlock && section.lines.some((line) => line.id === id))) return;
     const limit = field === 'details' ? MAX_DETAILS_LENGTH : MAX_NAME_LENGTH;
     const normalized = normalizeSingleLine(value, limit);
     changeDraft({ ...draft, sections: draft.sections.map((section) => section.type === 'phrase' ? ({
@@ -242,7 +272,7 @@ export default function App() {
     const lineCount = phraseSections(draft.sections).reduce((count, phrase) => count + phrase.lines.length, 0);
     if (lineCount >= MAX_LINES) return;
     const sections = draft.sections.map((section) => {
-      if (section.type !== 'phrase' || section.id !== phraseId) return section;
+      if (section.type !== 'phrase' || section.id !== phraseId || section.kataBlock) return section;
       const lines = [...section.lines];
       const index = afterId ? lines.findIndex((line) => line.id === afterId) : lines.length - 1;
       lines.splice(index + 1, 0, createEmptyLine());
@@ -345,6 +375,7 @@ export default function App() {
   }
 
   function removeLine(id: string) {
+    if (draft.sections.some((section) => section.type === 'phrase' && section.kataBlock && section.lines.some((line) => line.id === id))) return;
     changeDraft({ ...draft, sections: draft.sections.map((section) => section.type === 'phrase'
       ? { ...section, lines: section.lines.filter((line) => line.id !== id) } : section) });
     setExportError(null);
@@ -358,7 +389,7 @@ export default function App() {
     if (sourcePhraseIndex < 0 || (targetLineId && targetLineId === lineId)) return;
     const sourcePhrase = sections.find((section) => section.type === 'phrase' && section.id === phrases[sourcePhraseIndex].id);
     const targetPhrase = sections.find((section) => section.type === 'phrase' && section.id === phrases[targetPhraseIndex].id);
-    if (sourcePhrase?.type !== 'phrase' || targetPhrase?.type !== 'phrase') return;
+    if (sourcePhrase?.type !== 'phrase' || targetPhrase?.type !== 'phrase' || sourcePhrase.kataBlock || targetPhrase.kataBlock) return;
     const sourceLines = sourcePhrase.lines;
     const sourceIndex = sourceLines.findIndex((line) => line.id === lineId);
     const [line] = sourceLines.splice(sourceIndex, 1);
@@ -448,6 +479,7 @@ export default function App() {
     let cleared = false;
     try {
       window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(V9_STORAGE_KEY);
       window.localStorage.removeItem(V8_STORAGE_KEY);
       window.localStorage.removeItem(V7_STORAGE_KEY);
       window.localStorage.removeItem(V6_STORAGE_KEY);
@@ -474,6 +506,48 @@ export default function App() {
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
+  function exportKataBlock() {
+    const phrases = phraseSections(draft.sections);
+    if (projectCategory !== 'Kata' || phrases.length !== 1) return;
+    const error = getExportError({ ...draft, sections: [phrases[0]] });
+    if (error) { setExportError(error); return; }
+    try {
+      const index = draft.sections.findIndex((section) => section.id === phrases[0].id);
+      const duration = phrases[0].end - sectionStart(draft.sections, index);
+      const json = JSON.stringify(createKataBlockFile({ ...phrases[0], end: duration }, kataName), null, 2);
+      if (new TextEncoder().encode(json).byteLength > MAX_PROJECT_FILE_BYTES) throw new TypeError('oversized');
+      const url = URL.createObjectURL(new Blob([json], { type: 'application/json;charset=utf-8' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${kataName.trim().replace(/[^\p{L}\p{N} _-]/gu, '_')}.json`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      setKataNameOpen(false);
+      setKataName('');
+      setExportError(null);
+    } catch { setExportError('Le bloc Kata ne peut pas être exporté.'); }
+  }
+
+  function importKataBlock(block: ParsedKataBlock) {
+    if (projectCategory !== 'Kata') return;
+    if (phraseSections(draft.sections).reduce((count, phrase) => count + phrase.lines.length, 0) + block.lines.length > MAX_LINES) {
+      setNotice(`Un projet ne peut pas dépasser ${MAX_LINES} lignes d’action.`);
+      return;
+    }
+    const fightersByName = new Map(draft.fighters.filter((fighter) => fighter.name.trim()).map((fighter) => [fighter.name, fighter]));
+    const names = [...new Set(block.lines.flatMap((line) => [line.attacker, line.defender]).filter((name) => name.trim()))];
+    if (!names.every((name) => kataMappings[name] && fightersByName.has(kataMappings[name]))) return;
+    const start = draft.sections.at(-1)?.end ?? 0;
+    const phrase: PhraseDArmes = {
+      type: 'phrase', id: createLineId(), kataBlock: block.name, end: start + block.end,
+      lines: block.lines.map((line) => ({ ...line, id: createLineId(), attacker: kataMappings[line.attacker] || line.attacker, defender: line.defender ? kataMappings[line.defender] || line.defender : '' })),
+    };
+    changeDraft({ ...draft, sections: [...draft.sections, phrase] });
+    setPendingKataBlock(null);
+    setKataMappings({});
+    setNotice(`Le bloc Kata « ${block.name} » a été ajouté.`);
+  }
+
   function exportJson() {
     const json = JSON.stringify(createProjectFile(draft), null, 2);
     if (new TextEncoder().encode(json).byteLength > MAX_PROJECT_FILE_BYTES) {
@@ -494,7 +568,21 @@ export default function App() {
         setNotice('Le fichier dépasse la taille maximale de 10 Mo.');
         return;
       }
-      const importedDraft = parseProjectFile(await file.text(), movementCategories);
+      const json = await file.text();
+      const isBlock = parseKataBlockFile(json);
+      if (isBlock === null) {
+        setNotice('Ce fichier JSON est invalide ou utilise une version non prise en charge. Le projet actuel est conservé.');
+        return;
+      }
+      if (isBlock) {
+        if (projectCategory !== 'Kata') { setNotice('Les blocs Kata ne peuvent être importés que dans un projet de catégorie Kata.'); return; }
+        if (!draft.fighters.some((fighter) => fighter.name.trim())) { setNotice('Ajoutez au moins un combattant avant d’importer un bloc Kata.'); return; }
+        const names = [...new Set(isBlock.lines.flatMap((line) => [line.attacker, line.defender]).filter((name) => name.trim()))];
+        setKataMappings(Object.fromEntries(names.map((name) => [name, ''])));
+        setPendingKataBlock(isBlock);
+        return;
+      }
+      const importedDraft = parseProjectFile(json, movementCategories);
       if (!importedDraft) {
         setNotice('Ce fichier JSON est invalide ou utilise une version non prise en charge. Le projet actuel est conservé.');
         return;
@@ -559,6 +647,7 @@ export default function App() {
               <button type="button" onClick={() => { exportProject(); setDownloadMenuOpen(false); }}>Texte (.txt)</button>
               <button type="button" onClick={() => { setDownloadMenuOpen(false); setPdfDialogOpen(true); }}>PDF ASL-FFE (.pdf)</button>
               <button type="button" onClick={exportJson}>Projet Forge Chorégraphique (.json)</button>
+              {projectCategory === 'Kata' && phrases.length === 1 && <button type="button" onClick={() => { setKataNameOpen(true); setDownloadMenuOpen(false); }}>Bloc Kata (.json)</button>}
             </div>}
           </div>
         </div>
@@ -720,11 +809,11 @@ export default function App() {
               }
               const phrase = section;
               const phraseIndex = phraseSections(draft.sections.slice(0, sectionIndex + 1)).length - 1;
-              const phraseName = `Phrase d’armes ${phraseIndex + 1}`;
+              const phraseName = phrase.kataBlock ? `Bloc Kata · ${phrase.kataBlock}` : `Phrase d’armes ${phraseIndex + 1}`;
               return (
-                <section className="phrase-group" key={phrase.id} aria-labelledby={`phrase-title-${phrase.id}`} data-tour={phraseIndex === 0 ? 'phrases' : undefined} onDragOver={(event) => { if (event.dataTransfer.types.includes('application/x-section')) event.preventDefault(); }} onDrop={(event) => handleSectionDrop(event, phrase.id)}>
+                <section className={`phrase-group${phrase.kataBlock ? ' kata-block' : ''}`} key={phrase.id} aria-labelledby={`phrase-title-${phrase.id}`} data-tour={phraseIndex === 0 ? 'phrases' : undefined} onDragOver={(event) => { if (event.dataTransfer.types.includes('application/x-section')) event.preventDefault(); }} onDrop={(event) => handleSectionDrop(event, phrase.id)}>
                   <div className="phrase-rail">
-                    <h3 id={`phrase-title-${phrase.id}`} tabIndex={-1} data-phrase-focus={phrase.id} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-section', phrase.id); }}>{phraseName}</h3>
+                    <h3 id={`phrase-title-${phrase.id}`} tabIndex={-1} data-phrase-focus={phrase.id} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-section', phrase.id); }}>{phraseName}{phrase.kataBlock && <small> · Lecture seule</small>}</h3>
                     <div className="phrase-timing"><span>Début</span><span>{formatTiming(start)}</span></div>
                     <label className="phrase-timing" htmlFor={`phrase-end-${phrase.id}`}><span>Fin</span>
                       <input
@@ -759,7 +848,9 @@ export default function App() {
                     </button>
                     <div className="section-order"><button className="icon-button" type="button" aria-label={`Monter ${phraseName}`} disabled={sectionIndex === 0} onClick={() => moveSection(phrase.id, -1)}>↑</button><button className="icon-button" type="button" aria-label={`Descendre ${phraseName}`} disabled={sectionIndex === draft.sections.length - 1} onClick={() => moveSection(phrase.id, 1)}>↓</button></div>
                   </div>
-                  <div
+                  {phrase.kataBlock ? <div className="kata-readonly-lines" aria-label={`Actions du bloc Kata ${phrase.kataBlock}`}>
+                    {phrase.lines.map((line, lineIndex) => <p key={line.id}><span>{phraseIndex + 1}.{lineIndex + 1}</span> {formatKataLine(line)[0]}   <span style={{ fontSize: '8px' }}>{formatKataLine(line)[1]}</span></p>)}
+                  </div> : <div
                     className={`phrase-lines${phrase.lines.length === 0 && dropTarget === `${phrase.id}:empty` ? ' is-drop-target' : ''}`}
                     onDragOver={(event) => { if (phrase.lines.length === 0) { event.preventDefault(); setDropTarget(`${phrase.id}:empty`); } }}
                     onDragLeave={() => setDropTarget(null)}
@@ -816,7 +907,7 @@ export default function App() {
                       );
                     })}
                     {phrase.lines.length === 0 && <div className="empty-phrase" data-tour={phraseIndex === 0 ? 'lines' : undefined}><p>Déposez une ligne ici ou ajoutez-en une.</p><button className="button button-muted" type="button" disabled={lineCount >= MAX_LINES} onClick={() => addLine(phrase.id)}>Ajouter la première ligne</button></div>}
-                  </div>
+                  </div>}
                 </section>
               );
             })}
@@ -845,6 +936,20 @@ export default function App() {
           <div className="pdf-dialog-actions"><button className="button button-muted" type="button" onClick={() => setPdfDialogOpen(false)}>Annuler</button><button className="button button-primary" type="submit">Télécharger le PDF</button></div>
         </form>
       </dialog>
+      {kataNameOpen && <dialog ref={kataExportDialogRef} className="pdf-dialog" aria-labelledby="kata-export-title" onClose={() => setKataNameOpen(false)}>
+        <form onSubmit={(event) => { event.preventDefault(); exportKataBlock(); }}>
+          <p className="eyebrow">EXPORT KATA</p><h2 id="kata-export-title">Nommer la phrase d’armes</h2>
+          <label htmlFor="kata-block-name">Nom du bloc Kata</label><input id="kata-block-name" required maxLength={MAX_NAME_LENGTH} value={kataName} onChange={(event) => setKataName(normalizeSingleLine(event.target.value, MAX_NAME_LENGTH))} />
+          <div className="pdf-dialog-actions"><button className="button button-muted" type="button" onClick={() => setKataNameOpen(false)}>Annuler</button><button className="button button-primary" type="submit">Télécharger le bloc</button></div>
+        </form>
+      </dialog>}
+      {pendingKataBlock && <dialog ref={kataImportDialogRef} className="pdf-dialog kata-import-dialog" aria-labelledby="kata-import-title" onClose={() => setPendingKataBlock(null)}>
+        <form onSubmit={(event) => { event.preventDefault(); importKataBlock(pendingKataBlock); }}>
+          <p className="eyebrow">IMPORT KATA</p><h2 id="kata-import-title">Associer les combattants</h2><p>Bloc « {pendingKataBlock.name} » · durée {formatTiming(pendingKataBlock.end)} s</p>
+          {Object.keys(kataMappings).map((name) => <label key={name} htmlFor={`kata-map-${name}`}>{name}<select id={`kata-map-${name}`} required value={kataMappings[name]} onChange={(event) => setKataMappings((mappings) => ({ ...mappings, [name]: event.target.value }))}><option value="">Choisir un combattant</option>{draft.fighters.filter((fighter) => fighter.name.trim()).map((fighter) => <option key={fighter.id} value={fighter.name}>{fighter.name}</option>)}</select></label>)}
+          <div className="pdf-dialog-actions"><button className="button button-muted" type="button" onClick={() => setPendingKataBlock(null)}>Annuler</button><button className="button button-primary" type="submit" disabled={Object.keys(kataMappings).some((name) => !kataMappings[name])}>Ajouter la phrase</button></div>
+        </form>
+      </dialog>}
     </main>
   );
 }

@@ -101,6 +101,42 @@ describe('App security and editor basics', () => {
     expect(window.confirm).toHaveBeenCalledOnce();
   });
 
+  it('appends a Kata block after fighter mapping and keeps its actions read-only', async () => {
+    const { defaultDraft, createKataBlockFile } = await import('./lib/project');
+    const draft = defaultDraft();
+    const phrase = draft.sections[0];
+    if (phrase.type !== 'phrase') throw new Error('Default phrase missing');
+    phrase.lines[0] = { ...phrase.lines[0], attacker: 'Source A', handMovement: 'Parade', defender: 'Source B' };
+    const file = new File([JSON.stringify(createKataBlockFile(phrase, 'Ouverture'))], 'kata.json', { type: 'application/json' });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const { container } = render(<App />);
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!input) throw new Error('JSON import input was not rendered');
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByRole('heading', { name: 'Associer les combattants' })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Source A' }), { target: { value: 'Combattant A' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Source B' }), { target: { value: 'Combattant B' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter la phrase' }));
+
+    expect(await screen.findByRole('heading', { name: /Bloc Kata · Ouverture.*Lecture seule/ })).toBeInTheDocument();
+    expect(screen.getByLabelText('Actions du bloc Kata Ouverture')).toHaveTextContent(/Combattant A Parade contre Combattant B/);
+    expect(screen.queryByRole('combobox', { name: 'Attaquant, ligne 2.1' })).not.toBeInTheDocument();
+    expect(screen.getByRole('spinbutton', { name: 'Fin de Bloc Kata · Ouverture' })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Prénom du combattant 1' }), { target: { value: 'Alice' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Prénom du combattant 2' }), { target: { value: 'Bob' } });
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(screen.getByText('Kata')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Bloc Kata · Ouverture.*Lecture seule/ })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Prénom du combattant 2' })).toHaveValue('');
+
+    confirm.mockReturnValue(true);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Prénom du combattant 2' }), { target: { value: 'Bob' } });
+    expect(screen.getByText('Duel')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Bloc Kata/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Mouvement de main, ligne 2.1' })).toHaveValue('Parade');
+  });
+
   it('does not replace the project when the JSON structure is invalid', async () => {
     const { defaultDraft, createProjectFile } = await import('./lib/project');
     const fileData = createProjectFile(defaultDraft()) as ReturnType<typeof createProjectFile> & { injected?: string };
@@ -179,7 +215,7 @@ describe('App security and editor basics', () => {
     fireEvent.change(hand, { target: { value: 'Parade' } });
     fireEvent.blur(hand);
     expect(screen.queryByRole('combobox', { name: 'Cible, ligne 1.1' })).not.toBeInTheDocument();
-    expect(JSON.parse(window.localStorage.getItem('forgechoree.project.v9') ?? '{}').sections[0].lines[0].target).toBe('');
+    expect(JSON.parse(window.localStorage.getItem('forgechoree.project.v10') ?? '{}').sections[0].lines[0].target).toBe('');
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Défenseur facultatif, ligne 1.1' }), { target: { value: 'Combattant B' } });
     const reaction = screen.getByRole('combobox', { name: 'Mouvement de main du défenseur, ligne 1.1' });
@@ -235,7 +271,7 @@ describe('App security and editor basics', () => {
     const description = screen.getByRole('textbox', { name: 'Description des actions chorégraphiques de Temps chorégraphique 1' });
     fireEvent.change(description, { target: { value: 'Entrée en scène\nPuis salut.' } });
 
-    await waitFor(() => expect(JSON.parse(window.localStorage.getItem('forgechoree.project.v9') ?? '{}').sections[1].description).toBe('Entrée en scène\nPuis salut.'));
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem('forgechoree.project.v10') ?? '{}').sections[1].description).toBe('Entrée en scène\nPuis salut.'));
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     fireEvent.click(screen.getByRole('button', { name: 'Supprimer Temps chorégraphique 1' }));
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Sa description sera perdue.'));
@@ -270,7 +306,7 @@ describe('App security and editor basics', () => {
     expect(screen.getByRole('spinbutton', { name: 'Fin de Phrase d’armes 2' })).toHaveValue(15);
     expect(within(screen.getByRole('region', { name: 'Phrase d’armes 2' })).getByText('10.0')).toBeInTheDocument();
     expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Phrase d’armes 2' }));
-    expect(JSON.parse(window.localStorage.getItem('forgechoree.project.v9') ?? '{}').sections.filter((section: { type: string }) => section.type === 'phrase').map((phrase: { end: number }) => phrase.end)).toEqual([10, 15]);
+    expect(JSON.parse(window.localStorage.getItem('forgechoree.project.v10') ?? '{}').sections.filter((section: { type: string }) => section.type === 'phrase').map((phrase: { end: number }) => phrase.end)).toEqual([10, 15]);
     expect(container.querySelectorAll('.phrase-group')).toHaveLength(2);
   });
 
@@ -298,7 +334,7 @@ describe('App security and editor basics', () => {
     expect(screen.getByRole('spinbutton', { name: 'Fin de Phrase d’armes 2' })).toHaveValue(5.5);
     const secondPhrase = screen.getByRole('region', { name: 'Phrase d’armes 2' });
     expect(within(secondPhrase).getByText('5.5')).toBeInTheDocument();
-    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v9') ?? '{}');
+    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v10') ?? '{}');
     expect(savedDraft.sections[0].end).toBe(5.5);
     expect(savedDraft.sections[1].end).toBe(5.5);
     fireEvent.click(screen.getByRole('button', { name: 'Calculer la durée d’opposition' }));
@@ -324,7 +360,7 @@ describe('App security and editor basics', () => {
     expect(attacker1).toHaveValue('Alice');
     expect(defender1).toHaveValue('Alice');
     expect(screen.getByRole('combobox', { name: 'Attaquant, ligne 1.2' })).toHaveValue('Combattant A bis');
-    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v9') ?? '{}');
+    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v10') ?? '{}');
     expect(savedDraft.fighters[0].name).toBe('Alice');
     expect(savedDraft.sections[0].lines[0].attacker).toBe('Alice');
     expect(savedDraft.sections[0].lines[0].defender).toBe('Alice');
@@ -381,7 +417,7 @@ describe('App security and editor basics', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Prénom de l’assistant 1' }), { target: { value: 'Sam' } });
     fireEvent.change(screen.getByRole('textbox', { name: 'Rôle de l’assistant 1' }), { target: { value: 'Figurant' } });
 
-    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v9') ?? '{}');
+    const savedDraft = JSON.parse(window.localStorage.getItem('forgechoree.project.v10') ?? '{}');
     expect(savedDraft.info).toMatchObject({ title: 'Le duel', notes: 'Une intrigue\nUne musique', ensemble: true });
     expect(savedDraft.assistants[0]).toMatchObject({ firstName: 'Sam', role: 'Figurant' });
   });
@@ -468,6 +504,7 @@ describe('App security and editor basics', () => {
     expect(window.localStorage.getItem('forgechoree.project.v7')).toBeNull();
     expect(window.localStorage.getItem('forgechoree.project.v8')).toBeNull();
     expect(window.localStorage.getItem('forgechoree.project.v9')).toBeNull();
+    expect(window.localStorage.getItem('forgechoree.project.v10')).toBeNull();
     expect(screen.getByText(/brouillon local a été effacé/i)).toHaveAttribute('role', 'status');
   });
 });

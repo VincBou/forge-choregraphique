@@ -1,4 +1,5 @@
-export const STORAGE_KEY = 'forgechoree.project.v9';
+export const STORAGE_KEY = 'forgechoree.project.v10';
+export const V9_STORAGE_KEY = 'forgechoree.project.v9';
 export const V8_STORAGE_KEY = 'forgechoree.project.v8';
 export const V7_STORAGE_KEY = 'forgechoree.project.v7';
 export const V6_STORAGE_KEY = 'forgechoree.project.v6';
@@ -73,6 +74,7 @@ export type PhraseDArmes = {
   id: string;
   end: number;
   lines: ChoreographyLine[];
+  kataBlock?: string;
 };
 
 export type TempsChoregraphique = { type: 'temps'; id: string; end: number; description: string };
@@ -87,9 +89,11 @@ export type ProjectDraft = {
 
 export type ProjectFile = {
   format: 'forge-choregraphique';
-  version: 5;
+  version: 6;
   project: ProjectDraft;
 };
+
+export type KataBlockFile = { format: 'forge-choregraphique'; version: 6; bloc_kata: true; nom: string; phrase: { end: number; lines: Omit<ChoreographyLine, 'id'>[] } };
 
 type LegacyLine = { id: string; attacker: string; action: string; details: string; defender: string };
 type LegacyReactionLine = Omit<ChoreographyLine, 'defenderHandMovement' | 'defenderFootMovement'> & { defenderMovement: string };
@@ -229,6 +233,7 @@ function isValidSection(value: unknown, ids: Set<string>, lineCount: { value: nu
   previousEnd.value = section.end;
   if (section.type === 'temps') return isValidMultiline(section.description, MAX_PROJECT_INFO_LENGTH);
   if (section.type !== 'phrase' || !Array.isArray(section.lines)) return false;
+  if (section.kataBlock !== undefined && (!isValidText(section.kataBlock, MAX_NAME_LENGTH) || !section.kataBlock.trim())) return false;
   lineCount.value += section.lines.length;
   return lineCount.value <= MAX_LINES && section.lines.every((line) => isValidChoreographyLine(line, ids));
 }
@@ -248,7 +253,8 @@ export function isProjectDraft(value: unknown): value is ProjectDraft {
   return draft.sections.every((section) => {
     if ((section as ChoreographySection)?.type === 'phrase') phraseCount += 1;
     return isValidSection(section, ids, lineCount, previousEnd);
-  }) && phraseCount > 0;
+  }) && phraseCount > 0 && (draft.sections.every((section) => section.type !== 'phrase' || section.kataBlock === undefined)
+    || calculateProjectCategory(draft.fighters, draft.info.ensemble) === 'Kata');
 }
 
 function hasExactKeys(value: unknown, keys: string[]): value is Record<string, unknown> {
@@ -265,7 +271,7 @@ function sanitizeProjectDraft(value: unknown, rejectUnknown = true, allowMissing
     && draft.fighters.every((fighter) => hasExactKeys(fighter, ['id', 'name', 'firstName', 'lastName', 'licenseNumber', 'captain']))
     && draft.assistants.every((assistant) => hasExactKeys(assistant, ['id', 'firstName', 'lastName', 'licenseNumber', 'role']))
     && draft.sections.every((section) => section.type === 'phrase'
-      ? hasExactKeys(section, ['type', 'id', 'end', 'lines'])
+      ? hasExactKeys(section, section.kataBlock === undefined ? ['type', 'id', 'end', 'lines'] : ['type', 'id', 'end', 'lines', 'kataBlock'])
         && section.lines.every((line) => hasExactKeys(line, allowMissingTargets
           ? ['id', 'attacker', 'handMovement', 'footMovement', 'details', 'defender', 'defenderHandMovement', 'defenderFootMovement', 'defenderDetails']
           : ['id', 'attacker', 'handMovement', 'footMovement', 'target', 'details', 'defender', 'defenderHandMovement', 'defenderFootMovement', 'defenderTarget', 'defenderDetails']))
@@ -280,7 +286,7 @@ function sanitizeProjectDraft(value: unknown, rejectUnknown = true, allowMissing
       ? { type: 'temps', id: section.id, end: section.end, description: section.description }
       : { type: 'phrase', id: section.id, end: section.end, lines: section.lines.map(({ id, attacker, handMovement, footMovement, target, details, defender, defenderHandMovement, defenderFootMovement, defenderTarget, defenderDetails }) => ({
         id, attacker, handMovement, footMovement, target: target ?? '', details, defender, defenderHandMovement, defenderFootMovement, defenderTarget: defenderTarget ?? '', defenderDetails,
-      })) }),
+      })), ...(section.kataBlock === undefined ? {} : { kataBlock: section.kataBlock }) }),
   };
 }
 
@@ -352,7 +358,38 @@ function sanitizeV5Draft(value: unknown): V5Draft | null {
 export function createProjectFile(project: ProjectDraft): ProjectFile {
   const safeProject = sanitizeProjectDraft(project, false);
   if (!safeProject) throw new TypeError('Invalid project draft');
-  return { format: 'forge-choregraphique', version: 5, project: safeProject };
+  return { format: 'forge-choregraphique', version: 6, project: safeProject };
+}
+
+export function createKataBlockFile(phrase: PhraseDArmes, name: string): KataBlockFile {
+  if (!isValidText(name, MAX_NAME_LENGTH) || !name.trim() || !Number.isFinite(phrase.end) || phrase.end < 0 || phrase.lines.length > MAX_LINES
+    || !phrase.lines.every(hasStartedLine)) throw new TypeError('Invalid kata block');
+  return { format: 'forge-choregraphique', version: 6, bloc_kata: true, nom: name.trim(), phrase: {
+    end: phrase.end,
+    lines: phrase.lines.map(({ id: _id, ...line }) => line),
+  } };
+}
+
+export type ParsedKataBlock = { name: string; end: number; lines: Omit<ChoreographyLine, 'id'>[] };
+
+export function parseKataBlockFile(json: string): ParsedKataBlock | null | undefined {
+  if (new TextEncoder().encode(json).byteLength > MAX_PROJECT_FILE_BYTES) return null;
+  try {
+    const value: unknown = JSON.parse(json.charCodeAt(0) === 0xfeff ? json.slice(1) : json);
+    if (!value || typeof value !== 'object' || (value as Record<string, unknown>).bloc_kata !== true) return undefined;
+    if (!hasExactKeys(value, ['format', 'version', 'bloc_kata', 'nom', 'phrase']) || value.format !== 'forge-choregraphique' || value.version !== 6
+      || !isValidText(value.nom, MAX_NAME_LENGTH) || !value.nom.trim() || !value.phrase || typeof value.phrase !== 'object'
+      || !hasExactKeys(value.phrase, ['end', 'lines']) || typeof value.phrase.end !== 'number' || !Number.isFinite(value.phrase.end) || value.phrase.end < 0
+      || !Array.isArray(value.phrase.lines) || value.phrase.lines.length === 0 || value.phrase.lines.length > MAX_LINES) return null;
+    const ids = new Set<string>();
+    const lineKeys = ['attacker', 'handMovement', 'footMovement', 'target', 'details', 'defender', 'defenderHandMovement', 'defenderFootMovement', 'defenderTarget', 'defenderDetails'];
+    if (!value.phrase.lines.every((line) => hasExactKeys(line, lineKeys))) return null;
+    const lines = value.phrase.lines.map((line, index) => ({ id: `kata-${index}`, ...line as Record<string, unknown> }));
+    if (!lines.every((line) => isValidChoreographyLine(line, ids)
+      && hasExactKeys(line, ['id', 'attacker', 'handMovement', 'footMovement', 'target', 'details', 'defender', 'defenderHandMovement', 'defenderFootMovement', 'defenderTarget', 'defenderDetails'])
+      && hasStartedLine(line as unknown as ChoreographyLine))) return null;
+    return { name: value.nom, end: value.phrase.end, lines: lines.map(({ id: _id, ...line }) => line as unknown as Omit<ChoreographyLine, 'id'>) };
+  } catch { return null; }
 }
 
 export function parseProjectFile(json: string, movementCategories: ReadonlyMap<string, MovementCategory> = new Map()): ProjectDraft | null {
@@ -360,8 +397,8 @@ export function parseProjectFile(json: string, movementCategories: ReadonlyMap<s
   try {
     const value: unknown = JSON.parse(json.charCodeAt(0) === 0xfeff ? json.slice(1) : json);
     if (!hasExactKeys(value, ['format', 'version', 'project'])
-      || value.format !== 'forge-choregraphique' || ![1, 2, 3, 4, 5].includes(value.version as number)) return null;
-    if (value.version === 5) return sanitizeProjectDraft(value.project);
+      || value.format !== 'forge-choregraphique' || ![1, 2, 3, 4, 5, 6].includes(value.version as number)) return null;
+    if (value.version === 6 || value.version === 5) return sanitizeProjectDraft(value.project);
     if (value.version === 4) return migrateMissingTimeDescriptions(value.project);
     if (value.version === 3) return migrateLegacyReactionDraft(value.project, movementCategories);
     if (value.version === 2) return migrateLegacyReactionDraft(value.project, movementCategories, true, false);
@@ -484,6 +521,15 @@ export function loadDraft(storage?: DraftStorage, movementCategories: ReadonlyMa
       } catch { currentInvalid = true; }
     }
 
+    const v9Raw = target.getItem(V9_STORAGE_KEY);
+    if (v9Raw !== null) {
+      try {
+        const v9: unknown = JSON.parse(v9Raw);
+        const migrated = sanitizeProjectDraft(v9);
+        if (migrated) return saveMigratedDraft(target, V9_STORAGE_KEY, migrated);
+      } catch { /* Try older draft formats. */ }
+    }
+
     const v8Raw = target.getItem(V8_STORAGE_KEY);
     if (v8Raw !== null) {
       try {
@@ -551,7 +597,7 @@ export function loadDraft(storage?: DraftStorage, movementCategories: ReadonlyMa
       } catch { /* Show the invalid-draft warning below. */ }
     }
 
-    if (currentInvalid || v8Raw !== null || v7Raw !== null || v6Raw !== null || v5Raw !== null || v4Raw !== null || v3Raw !== null || v2Raw !== null || legacyRaw !== null) {
+    if (currentInvalid || v9Raw !== null || v8Raw !== null || v7Raw !== null || v6Raw !== null || v5Raw !== null || v4Raw !== null || v3Raw !== null || v2Raw !== null || legacyRaw !== null) {
       return { draft: defaultDraft(), warning: 'Le brouillon enregistré est invalide. Un nouveau projet a été ouvert.', migrated: false };
     }
     return { draft: defaultDraft(), warning: null, migrated: false };
@@ -615,6 +661,16 @@ export function formatChoreographyLine(line: ChoreographyLine): string {
   return `${line.attacker.trim()} ${movements}${details ? ` ${details}` : ''}${defender ? ` contre ${defender}${reaction ? ` qui ${reaction}` : ''}` : ''}`;
 }
 
+export function formatKataLine(line: ChoreographyLine): string[] {
+  const details = line.details.trim();
+  const defender = line.defender.trim();
+  const target = (line.target ?? '').trim();
+  const defenderTarget = (line.defenderTarget ?? '').trim();
+  const movements = [line.handMovement.trim(), line.footMovement.trim(), target ? `(cible : ${target})` : ''].filter(Boolean).join(' ');
+  const reaction = defender ? [line.defenderHandMovement.trim(), line.defenderFootMovement.trim(), defenderTarget ? `(cible : ${defenderTarget})` : '', line.defenderDetails.trim()].filter(Boolean).join(' ') : '';
+  return [`${line.attacker.trim()} ${movements}${details ? ` ${details}` : ''}`,`${defender ? ` contre ${defender}${reaction ? ` qui ${reaction}` : ''}` : ''}`];
+}
+
 export function formatProject(draft: ProjectDraft): string {
   const output: string[] = [];
   let start = 0;
@@ -634,6 +690,7 @@ export function formatProject(draft: ProjectDraft): string {
     const lines = section.lines.filter(hasStartedLine);
     if (lines.length) {
       output.push(`${formatTime(start)} - Début Phrase ${number}`);
+      if (section.kataBlock) output.push(`Bloc Kata : ${section.kataBlock}`);
       lines.forEach((line, index) => output.push(`${number}.${index + 1} - ${formatChoreographyLine(line)}`));
       output.push(`${formatTime(section.end)} - Fin Phrase ${number}`);
       output.push('');

@@ -83,7 +83,7 @@ export async function downloadProjectPdf(draft: ProjectDraft, selectedFormat: st
   for (const section of draft.sections) {
     const number = section.type === 'phrase' ? ++phraseNumber : ++timeNumber;
     content.push(
-      { text: section.type === 'phrase' ? `Phrase d’armes ${number}` : `Temps chorégraphique ${number}`, style: 'sectionTitle', pageBreak: 'before' },
+      { text: section.type === 'phrase' ? section.kataBlock ? `Bloc Kata · ${section.kataBlock}` : `Phrase d’armes ${number}` : `Temps chorégraphique ${number}`, style: 'sectionTitle', pageBreak: 'before' },
       { columns: [{ text: `${formatTime(start)} · Début`, style: 'body' }, { text: `${formatTime(section.end)} · Fin`, alignment: 'right', style: 'body' }], margin: [0, 0, 0, 10] },
     );
     if (section.type === 'temps') {

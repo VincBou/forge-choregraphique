@@ -93,8 +93,9 @@ export default function RepresentationView({ project, initialElapsedMs, onBack }
       {project.sections.map((section, sectionIndex) => {
         const startAt = sectionStart(project, sectionIndex);
         const activeSection = focus?.sectionId === section.id;
+        const sectionNumber = project.sections.slice(0, sectionIndex + 1).filter((item) => item.type === 'phrase').length;
         const sectionName = section.type === 'phrase'
-          ? `Phrase d’armes ${project.sections.slice(0, sectionIndex + 1).filter((item) => item.type === 'phrase').length}`
+          ? section.kataBlock ? `Bloc Kata · ${section.kataBlock}` : `Phrase d’armes ${sectionNumber}`
           : `Temps chorégraphique ${project.sections.slice(0, sectionIndex + 1).filter((item) => item.type === 'temps').length}`;
         return <section className={`representation-section${activeSection ? ' is-active' : ''}`} id={`representation-section-${section.id}`} key={section.id}>
           <header className="representation-section-heading"><h2>{sectionName}</h2><span>{formatSectionTime(startAt)} – {formatSectionTime(section.end)}</span></header>
@@ -103,7 +104,7 @@ export default function RepresentationView({ project, initialElapsedMs, onBack }
             const distance = actionIndex !== undefined && focus?.lineId ? Math.abs(actionIndex - (actionIndices.get(focus.lineId) ?? actionIndex)) : 0;
             const emphasis = actionIndex !== undefined && focus?.lineId === line.id ? ' is-current' : distance === 1 ? ' is-neighbor-1' : distance === 2 ? ' is-neighbor-2' : '';
             const text = hasStartedLine(line) ? `${formatChoreographyLine(line)}` : 'Ligne à compléter';
-            return <p className={`representation-line${emphasis}`} id={`representation-line-${line.id}`} key={line.id}><span className="representation-line-number">{sectionName.replace('Phrase d’armes ', '')}.{lineIndex + 1}</span>{text}</p>;
+            return <p className={`representation-line${emphasis}`} id={`representation-line-${line.id}`} key={line.id}><span className="representation-line-number">{sectionNumber}.{lineIndex + 1}</span>{text}</p>;
           })}
         </section>;
       })}
